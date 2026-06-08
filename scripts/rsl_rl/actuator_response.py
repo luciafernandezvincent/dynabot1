@@ -281,3 +281,5 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 if __name__ == "__main__":
     main()
     simulation_app.close()
+
+# base_to_front_left_shoulder front_left_shoulder_to_arm front_left_arm_to_hand

@@ -1,7 +1,7 @@
 from isaaclab.utils import configclass
 
 from .rough_env_cfg import AnymalDRoughEnvCfg
-
+from dynabot1.assets.dynabot import DYNABOT_1_CFG  
 
 @configclass
 class AnymalDFlatEnvCfg(AnymalDRoughEnvCfg):
@@ -36,3 +36,21 @@ class AnymalDFlatEnvCfg_PLAY(AnymalDFlatEnvCfg):
         # remove random pushing
         self.events.base_external_force_torque = None
         self.events.push_robot = None
+
+class GraphArtResEnvCfg(AnymalDFlatEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        
+        # 1. Modificamos articulation_props para cambiar el fix_root_link
+        articulation_props_modificado = DYNABOT_1_CFG.spawn.articulation_props.replace(
+            fix_root_link=True
+        )
+        
+        # 2. Metemos esas propiedades modificadas dentro del spawn del robot
+        self.scene.robot = DYNABOT_1_CFG.replace(
+            prim_path="{ENV_REGEX_NS}/Robot",
+            spawn=DYNABOT_1_CFG.spawn.replace(
+                articulation_props=articulation_props_modificado
+            )
+        )
+        
