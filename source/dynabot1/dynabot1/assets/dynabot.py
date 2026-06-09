@@ -69,7 +69,7 @@ DYNABOT_1_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.3),
+        pos=(0.0, 0.0, 1.0),
         joint_pos={
             ".*_shoulder": 0.0,
             ".*shoulder_to_arm": - 0.79,

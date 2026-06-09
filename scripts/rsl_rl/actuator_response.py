@@ -3,6 +3,7 @@ import os
 import sys
 import time
 
+
 from isaaclab.app import AppLauncher
 
 import cli_args  # isort: skip
@@ -60,22 +61,12 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 import dynabot1.tasks  # noqa: F401
 
 
-def build_manual_action(
-    t,
-    num_envs,
-    action_dim,
-    device,
-    action_indices,
-    mode,
-    step_value,
-    sine_amplitude,
-    sine_frequency,
-):
+def build_manual_action(t,num_envs, action_dim, device, action_indices, mode, step_value, sine_amplitude, sine_frequency):
     actions = torch.zeros(num_envs, action_dim, device=device)
 
     if mode == "step":
-        if t < 1.0:
-            value = 0.0
+        if t < 5.0:
+            value = 0.0 #cambiar con offset
         else:
             value = step_value
 
@@ -84,7 +75,7 @@ def build_manual_action(
 
     elif mode == "sine":
         value = sine_amplitude * torch.sin(
-            torch.tensor(2.0 * 3.14159265 * sine_frequency * t, device=device)
+            torch.tensor(2.0 * torch.pi * sine_frequency * t, device=device)
         )
 
         for action_idx in action_indices:
@@ -147,6 +138,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         t = timestep * dt
 
         with torch.inference_mode():
+
+            step_value = (args_cli.step_value*torch.pi)/90 #esta pra grados
             actions = build_manual_action(
                 t=t,
                 num_envs=env.unwrapped.num_envs,
@@ -154,7 +147,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 device=env.unwrapped.device,
                 action_indices=args_cli.action_indices,
                 mode=args_cli.test_mode,
-                step_value=args_cli.step_value,
+                step_value=step_value,
                 sine_amplitude=args_cli.sine_amplitude,
                 sine_frequency=args_cli.sine_frequency,
             )
