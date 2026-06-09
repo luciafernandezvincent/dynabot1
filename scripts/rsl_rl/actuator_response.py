@@ -61,12 +61,12 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 import dynabot1.tasks  # noqa: F401
 
 
-def build_manual_action(t,num_envs, action_dim, device, action_indices, mode, step_value, sine_amplitude, sine_frequency):
+def build_manual_action(t,num_envs, action_dim, device, action_indices, mode, step_value, sine_amplitude, sine_frequency, offset):
     actions = torch.zeros(num_envs, action_dim, device=device)
 
     if mode == "step":
         if t < 5.0:
-            value = 0.0 #cambiar con offset
+            value = 0.0 - offset #priemro tendria que ir al 0 (considerando el initial pose) y desp paso al movimiento buscando
         else:
             value = step_value
 
@@ -106,6 +106,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env_cfg.seed = args_cli.seed
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
+    initial_pos = {
+        ".*_shoulder": 0.0,
+        ".*shoulder_to_arm": - 0.79,
+        ".*arm_to_hand": 1.5,
+    } #ver que no sea hardcodeado
+
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
@@ -138,8 +144,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         t = timestep * dt
 
         with torch.inference_mode():
-
-            step_value = (args_cli.step_value*torch.pi)/90 #esta pra grados
+            offset = 0.0
+            for part, off in initial_pos.items():
+                if part in resolved_joint_names[0]: #esto depende de que solo haya un joint name
+                    offset = off
+ 
+            step_value = ((args_cli.step_value*torch.pi/180) - offset)/0.25
             actions = build_manual_action(
                 t=t,
                 num_envs=env.unwrapped.num_envs,
@@ -150,6 +160,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 step_value=step_value,
                 sine_amplitude=args_cli.sine_amplitude,
                 sine_frequency=args_cli.sine_frequency,
+                offset=offset
             )
 
             obs, _, dones, _ = env.step(actions)
