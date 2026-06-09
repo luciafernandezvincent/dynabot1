@@ -10,22 +10,17 @@ import cli_args  # isort: skip
 parser = argparse.ArgumentParser(description="Run manual actuator response test.")
 parser.add_argument("--video", action="store_true", default=False)
 parser.add_argument("--video_length", type=int, default=200)
-parser.add_argument("--disable_fabric", action="store_true", default=False)
 parser.add_argument("--num_envs", type=int, default=1)
-parser.add_argument("--task", type=str, default=None)
-parser.add_argument("--seed", type=int, default=None)
+parser.add_argument("--task", type=str, default="Dyna1-GraphArtRes-v0")
+parser.add_argument("--seed", type=int, default=123)
 parser.add_argument("--real-time", action="store_true", default=False)
 
 #Nuevos arguments
 parser.add_argument( "--robot_name", type=str, default="robot")
-parser.add_argument("--leg_joint_names", nargs="+", required=True,
-    help="Joint names to log, e.g. FL_shoulder FL_shoulder_to_arm FL_arm_to_hand."
-)
-parser.add_argument("--action_indices", nargs="+", type=int, required=True,
-    help="Action indices corresponding to the selected joints."
-)
+parser.add_argument("--leg_joint_names", nargs="+", required=True) #estos son de los que se generan graficos
+parser.add_argument("--action_indices", nargs="+", type=int, required=True) #indica qué componentes del vector de acciones querés modificar
 parser.add_argument("--test_mode", type=str, default="step", choices=["step", "sine", "sequence"])
-parser.add_argument("--test_steps", type=int, default=1000)
+parser.add_argument("--test_steps", type=int, default=1000) # para calc segundos de simulacion, el default es 5segs
 parser.add_argument("--step_value", type=float, default=0.4)
 parser.add_argument("--sine_amplitude", type=float, default=0.4)
 parser.add_argument("--sine_frequency", type=float, default=0.5)
@@ -64,7 +59,7 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 
 import dynabot1.tasks  # noqa: F401
 
-#VER COMO QUEREMOS QUE SEA LA ACCION    
+
 def build_manual_action(
     t,
     num_envs,
@@ -121,14 +116,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
-
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
 
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
-
     dt = env.unwrapped.step_dt
-
     robot = env.unwrapped.scene[args_cli.robot_name]
 
     print("[INFO] Available robot joints:")
@@ -168,7 +160,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             )
 
             obs, _, dones, _ = env.step(actions)
-
             data = robot.data
 
             for joint_name, joint_id in zip(resolved_joint_names, joint_ids):
@@ -180,32 +171,23 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                     "joint_pos": data.joint_pos[0, joint_id].item(),
                     "joint_vel": data.joint_vel[0, joint_id].item(),
                 }
-
                 if data.joint_pos_target is not None:
                     row["joint_pos_target"] = data.joint_pos_target[0, joint_id].item()
-
                 if data.joint_vel_target is not None:
                     row["joint_vel_target"] = data.joint_vel_target[0, joint_id].item()
-
                 if data.joint_effort_target is not None:
                     row["joint_effort_target"] = data.joint_effort_target[0, joint_id].item()
-
                 if data.applied_torque is not None:
                     row["applied_torque"] = data.applied_torque[0, joint_id].item()
-
                 if data.computed_torque is not None:
                     row["computed_torque"] = data.computed_torque[0, joint_id].item()
-
                 for i in range(actions.shape[1]):
                     row[f"action_{i}"] = actions[0, i].item()
-
                 logs.append(row)
 
         timestep += 1
-
         if timestep >= args_cli.test_steps:
             break
-
         sleep_time = dt - (time.time() - start_time)
         if args_cli.real_time and sleep_time > 0:
             time.sleep(sleep_time)
@@ -215,11 +197,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     df = pd.DataFrame(logs)
 
-    csv_path = os.path.join(output_dir, "actuator_response.csv")
+    joint_names = df["joint"].unique()
+    if len(joint_names) == 1:
+        csv_path = os.path.join(output_dir, f"actuator_response_{joint_names[0]}.csv")
+    else:
+        csv_path = os.path.join(output_dir, "actuator_response.csv")
+    
     df.to_csv(csv_path, index=False)
     print(f"[INFO] Saved CSV to: {csv_path}")
 
-    for joint_name in df["joint"].unique():
+    for joint_name in joint_names:
         d = df[df["joint"] == joint_name]
 
         plt.figure(figsize=(10, 5))
@@ -282,4 +269,4 @@ if __name__ == "__main__":
     main()
     simulation_app.close()
 
-# base_to_front_left_shoulder front_left_shoulder_to_arm front_left_arm_to_hand
+# base_to_front_right_shoulder front_right_shoulder_to_arm front_right_arm_to_hand
