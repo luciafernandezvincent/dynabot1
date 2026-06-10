@@ -57,6 +57,7 @@ from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
 
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils.hydra import hydra_task_config
+from omni.isaac.core import SimulationContext
 
 import dynabot1.tasks  # noqa: F401
 
@@ -106,6 +107,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env_cfg.seed = args_cli.seed
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
+    initial_pos = {
+        ".*_shoulder": 0.0,
+        ".*shoulder_to_arm": - 0.79,
+        ".*arm_to_hand": 1.5,
+    } #ver que no sea hardcodeado
+
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
@@ -134,7 +141,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     timestep = 0
 
     ##### NUEVO: ANÁLISIS DE FRECUENCIA ANTES DEL BUCLE #####
-    from omni.isaac.core import SimulationContext
     sim_context = SimulationContext.instance()
     
     physics_dt = sim_context.get_physics_dt()
@@ -143,18 +149,21 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     print(f"-> La física calcula a:    {1.0 / physics_dt:.1f} Hz (dt: {physics_dt} s)")
     print(f"-> Tu gráfico registrará a: {1.0 / dt:.1f} Hz (dt: {dt} s)")
     print("="*50 + "\n")
-    ########################################################
 
     while simulation_app.is_running():
         start_time = time.time()
-        
+      
         ##### CAMBIO AQUÍ: Reemplazamos t = timestep * dt por el tiempo del simulador #####
-        t = sim_context.current_time 
-        ###################################################################################
+        t = sim_context.current_time
+        #t = timestep * dt
 
         with torch.inference_mode():
-
-            step_value = (args_cli.step_value*torch.pi)/90 #esta pra grados
+            offset = 0.0
+            for part, off in initial_pos.items():
+                if part in resolved_joint_names[0]: #esto depende de que solo haya un joint name
+                    offset = off
+ 
+            step_value = ((args_cli.step_value*torch.pi/180) - offset)/0.25
             actions = build_manual_action(
                 t=t,
                 num_envs=env.unwrapped.num_envs,
@@ -165,6 +174,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 step_value=step_value,
                 sine_amplitude=args_cli.sine_amplitude,
                 sine_frequency=args_cli.sine_frequency,
+                offset=offset
             )
 
             obs, _, dones, _ = env.step(actions)
@@ -173,7 +183,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             for joint_name, joint_id in zip(resolved_joint_names, joint_ids):
                 row = {
                     "step": timestep,
-                    "time": t, # Esto se queda igual, pero ahora 't' es exacta
+                    "time": t,
                     "joint": joint_name,
                     "joint_id": int(joint_id),
                     "joint_pos": data.joint_pos[0, joint_id].item(),
