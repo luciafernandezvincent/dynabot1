@@ -57,7 +57,7 @@ from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
 
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils.hydra import hydra_task_config
-from omni.isaac.core import SimulationContext
+
 
 import dynabot1.tasks  # noqa: F401
 
@@ -66,7 +66,7 @@ def build_manual_action(t,num_envs, action_dim, device, action_indices, mode, st
     actions = torch.zeros(num_envs, action_dim, device=device)
 
     if mode == "step":
-        if t < 5.0:
+        if t < 3.0:
             value = 0.0 - offset #priemro tendria que ir al 0 (considerando el initial pose) y desp paso al movimiento buscando
         else:
             value = step_value
@@ -108,9 +108,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
     initial_pos = {
-        ".*_shoulder": 0.0,
-        ".*shoulder_to_arm": - 0.79,
-        ".*arm_to_hand": 1.5,
+        "shoulder": 0.0,
+        "shoulder_to_arm": - 0.79,
+        "arm_to_hand": 1.5,
     } #ver que no sea hardcodeado
 
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
@@ -139,28 +139,25 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     logs = []
     timestep = 0
-
-    ##### NUEVO: ANÁLISIS DE FRECUENCIA ANTES DEL BUCLE #####
-    sim_context = SimulationContext.instance()
+    physics_dt = env.unwrapped.physics_dt
     
-    physics_dt = sim_context.get_physics_dt()
+
+
     print("\n" + "="*50)
     print(f"[ANÁLISIS DE FRECUENCIA DE DATOS]")
     print(f"-> La física calcula a:    {1.0 / physics_dt:.1f} Hz (dt: {physics_dt} s)")
     print(f"-> Tu gráfico registrará a: {1.0 / dt:.1f} Hz (dt: {dt} s)")
     print("="*50 + "\n")
 
+    measured_joint_name = robot.joint_names[args_cli.action_indices[0]]
     while simulation_app.is_running():
         start_time = time.time()
-      
-        ##### CAMBIO AQUÍ: Reemplazamos t = timestep * dt por el tiempo del simulador #####
-        t = sim_context.current_time
-        #t = timestep * dt
+        t = timestep * dt
 
         with torch.inference_mode():
             offset = 0.0
             for part, off in initial_pos.items():
-                if part in resolved_joint_names[0]: #esto depende de que solo haya un joint name
+                if part in measured_joint_name: #esto depende de que solo haya un joint name
                     offset = off
  
             step_value = ((args_cli.step_value*torch.pi/180) - offset)/0.25
@@ -210,16 +207,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         if args_cli.real_time and sleep_time > 0:
             time.sleep(sleep_time)
 
-    output_dir = os.path.abspath("actuator_response_results")
+    output_dir = os.path.abspath(f"actuator_response_results/sim_dyna/{measured_joint_name}")
     os.makedirs(output_dir, exist_ok=True)
 
     df = pd.DataFrame(logs)
 
     joint_names = df["joint"].unique()
-    if len(joint_names) == 1:
-        csv_path = os.path.join(output_dir, f"actuator_response_{joint_names[0]}.csv")
-    else:
-        csv_path = os.path.join(output_dir, "actuator_response.csv")
+    csv_path = os.path.join(output_dir, f"actuator_response_{measured_joint_name}.csv")
+
     
     df.to_csv(csv_path, index=False)
     print(f"[INFO] Saved CSV to: {csv_path}")
