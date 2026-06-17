@@ -78,17 +78,51 @@ DYNABOT_1_CFG = ArticulationCfg(
         joint_vel={".*": 0.0},
     ),
     soft_joint_pos_limit_factor=0.9,
-    actuators={
-        "legs": DCMotorCfg(
-            joint_names_expr=[".*_shoulder", ".*shoulder_to_arm", ".*arm_to_hand"],
+    # actuators={
+    #     "legs": DCMotorCfg(
+    #         joint_names_expr=[".*_shoulder", ".*shoulder_to_arm", ".*arm_to_hand"],
+    #         effort_limit=14.5,
+    #         saturation_effort=20.5,
+    #         velocity_limit=21.0,
+    #         stiffness=80.0,
+    #         damping=0.5,
+    #         friction=0.1,
+    #     ),
+    # },
+        actuators={
+        "shoulder": DCMotorCfg(
+            joint_names_expr=[".*_shoulder"],
             effort_limit=14.5,
             saturation_effort=20.5,
             velocity_limit=21.0,
-            stiffness=80.0,
-            damping=0.5,
-            friction=0.1,
+            stiffness=26.0,
+            damping=2.0,
+            friction=0.5,
+            armature=0.06,
         ),
+        "shoulder_to_arm": DCMotorCfg(
+            joint_names_expr=[".*shoulder_to_arm"],
+            effort_limit=14.5,
+            saturation_effort=20.5,
+            velocity_limit=21.0,
+            stiffness=24,  # Aumentamos para que empiece a moverse más rápido
+            damping=1.85,     # Aumentamos más que la rigidez para frenar el "pasarse"
+            friction=0.7,
+            armature=0.05,   # Un ligero aumento para dar realismo a la inercia del motor
+        ),
+        "arm_to_hand": DCMotorCfg(
+            joint_names_expr=[".*arm_to_hand"],
+            effort_limit=14.5,
+            saturation_effort=20.5,
+            velocity_limit=21.0,
+            stiffness=26.0,
+            damping=1.5,
+            friction=0.5,
+            armature=0.04,
+        ),
+        
     },
+
     #actuators={"legs": ANYDRIVE_3_LSTM_ACTUATOR_CFG},
     #soft_joint_pos_limit_factor=0.95,
 )

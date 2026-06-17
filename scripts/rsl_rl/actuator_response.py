@@ -67,7 +67,7 @@ def build_manual_action(t,num_envs, action_dim, device, action_indices, mode, st
 
     if mode == "step":
         if t < 3.0:
-            value = 0.0 - offset #priemro tendria que ir al 0 (considerando el initial pose) y desp paso al movimiento buscando
+            value = (0.0 - offset)/0.25 #primero tendria que ir al 0 (considerando el initial pose) y desp paso al movimiento buscando
         else:
             value = step_value
 
@@ -106,7 +106,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env_cfg.scene.num_envs = args_cli.num_envs
     env_cfg.seed = args_cli.seed
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
-    #env_cfg.decimation = 1  # log at physics rate (1/sim.dt Hz) instead of policy rate
+    env_cfg.decimation = 1  # log at physics rate (1/sim.dt Hz) instead of policy rate
 
     initial_pos = {
         "shoulder": 0.0,
