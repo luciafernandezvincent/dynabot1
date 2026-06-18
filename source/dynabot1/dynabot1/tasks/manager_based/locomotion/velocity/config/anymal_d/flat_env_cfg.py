@@ -1,7 +1,11 @@
+from isaaclab.managers import RewardTermCfg as RewTerm
+from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils import configclass
 
+import dynabot1.tasks.manager_based.locomotion.velocity.mdp as mdp
+
 from .rough_env_cfg import AnymalDRoughEnvCfg
-from dynabot1.assets.dynabot import DYNABOT_1_CFG  
+from dynabot1.assets.dynabot import DYNABOT_1_CFG
 
 @configclass
 class AnymalDFlatEnvCfg(AnymalDRoughEnvCfg):
@@ -21,6 +25,12 @@ class AnymalDFlatEnvCfg(AnymalDRoughEnvCfg):
         self.observations.policy.height_scan = None
         # no terrain curriculum
         self.curriculum.terrain_levels = None
+
+        self.rewards.undesired_contacts = RewTerm(
+            func=mdp.undesired_contacts,
+            weight=-1.0,
+            params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*arm_link"), "threshold": 1.0},
+        )
 
 
 class AnymalDFlatEnvCfg_PLAY(AnymalDFlatEnvCfg):
