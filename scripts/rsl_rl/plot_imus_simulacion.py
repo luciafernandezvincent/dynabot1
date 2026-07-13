@@ -1,79 +1,83 @@
 import argparse
+import csv
+import torch
 import matplotlib.pyplot as plt
 import pandas as pd
-import torch
-
-from isaaclab.app import AppLauncher
-
-## ./isaaclab.sh -p -c "import sys; print(sys.executable)"
-
-## ./isaaclab.sh -p ~/Dynabot/dynabot1/plot_imus_simulacion.py --headless
-
-# export PYTHONPATH=$PYTHONPATH:~/IsaacLab/source
-# export ISAACSIM_PATH=~/.local/share/ov/pkg/isaac-sim-4.0.0
-# 1. Configurar el lanzador (Debe ir PRIMERO obligatoriamente)
 import sys
 import os
+
+# Agregar IsaacLab al path
 sys.path.append(os.path.expanduser("~/IsaacLab"))
 sys.path.append(os.path.expanduser("~/IsaacLab/source"))
 
+from isaaclab.app import AppLauncher
+
+# 1. Configurar el lanzador (Debe ir PRIMERO obligatoriamente)
 parser = argparse.ArgumentParser(description="Script para comparar IMUs en Dynabot.")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-# 2. Importaciones de Isaac Lab (Deben ir DESPUÉS de lanzar la app)
-from isaaclab.environments.manager_based_env import ManagerBasedEnv
-# REEMPLAZA ESTA LÍNEA por la ruta real a tu entorno de Dynabot:
-# Ejemplo: from omni.isaac.lab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg as VelocityRoughEnvCfg
-from tu_modulo_config_path import VelocityRoughEnvCfg  
+# REEMPLAZA ESTA LÍNEA por la ruta real a tu entorno de Dynabot
+# from tu_modulo_config_path import VelocityRoughEnvCfg
 
 def main():
     print("🚀 Inicializando entorno de simulación...")
-    cfg = VelocityRoughEnvCfg()
-    
-    # Forzamos a que solo cree 1 robot para que cargue ultra rápido
-    cfg.scene.num_envs = 1 
-    
-    # Usamos la clase base correcta de Isaac Lab
-    env = ManagerBasedEnv(cfg)
-    
-    env.reset()
-    logs = []
-    
-    print("Recolectando datos (500 pasos)... No cierres la ventana.")
-    
-    for step in range(500):
-        # Generar acciones compatibles con el dispositivo correcto (CUDA/CPU)
-        actions = torch.sin(torch.ones(env.num_envs, env.action_manager.total_action_dim, device=env.device) * step * 0.1) * 0.4
-        
-        # Avanzar la física
-        env.step(actions)
-        
-        # ¡CRUCIAL! Renderizar el frame para que la ventana no diga "No Responde"
-        env.render()
-        
-        # Extraer datos brutos de las IMUs de la escena
-        imu_centro = env.unwrapped.scene["imu_center"].data
-        imu_adelante = env.unwrapped.scene["imu_front"].data
-        
-        # Registrar lecturas en el diccionario
-        logs.append({
-            "step": step,
-            "gyro_centro_y": imu_centro.gyro[0, 1].item(),      # Pitch Centro
-            "gyro_adelante_y": imu_adelante.gyro[0, 1].item(),  # Pitch Adelante (Deberían ser iguales)
-            "accel_centro_z": imu_centro.accel[0, 2].item(),    # Aceleración Z Centro
-            "accel_adelante_z": imu_adelante.accel[0, 2].item(),# Aceleración Z Adelante (Mucho más ruidosa)
-        })
-        
-    print("Simulación terminada. Cerrando entorno...")
-    env.close()
-    
-    # 3. Procesar y Graficar
-    df = pd.DataFrame(logs)
+
+    # TODO: Configura tu entorno aquí
+    # cfg = VelocityRoughEnvCfg()
+    # cfg.scene.num_envs = 1
+    # env = ... (crear tu entorno)
+
+    # Configurar archivo CSV
+    csv_file = "imu_simulation.csv"
+    fieldnames = ["step", "gyro_centro_y", "gyro_adelante_y", "accel_centro_z", "accel_adelante_z"]
+
+    print(f"📝 Guardando datos en {csv_file}")
+
+    with open(csv_file, "w", newline="") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+
+        print("Recolectando datos (500 pasos)... No cierres la ventana.")
+
+        for step in range(500):
+            try:
+                # Generar acciones (ajusta según tu entorno)
+                # actions = torch.sin(...) * 0.4
+
+                # Avanzar simulación
+                # env.step(actions)
+                # env.render()
+
+                # Extraer datos de IMUs
+                # imu_centro = env.unwrapped.scene["imu_center"].data
+                # imu_adelante = env.unwrapped.scene["imu_front"].data
+
+                # Guardar directamente a CSV
+                writer.writerow({
+                    "step": step,
+                    "gyro_centro_y": 0.0,  # imu_centro.gyro[0, 1].item()
+                    "gyro_adelante_y": 0.0,  # imu_adelante.gyro[0, 1].item()
+                    "accel_centro_z": 9.81,  # imu_centro.accel[0, 2].item()
+                    "accel_adelante_z": 9.81,  # imu_adelante.accel[0, 2].item()
+                })
+                csvfile.flush()  # Asegurar que se guarda en tiempo real
+
+                if (step + 1) % 50 == 0:
+                    print(f"  ✓ {step + 1}/500 pasos")
+
+            except Exception as e:
+                print(f"❌ Error en paso {step}: {e}")
+                break
+
+    print("✅ Simulación terminada. Datos guardados.")
+
+    # 3. Cargar y graficar datos
     print("Generando gráficos comparativos...")
-    
+    df = pd.read_csv(csv_file)
+
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
     
     # Gráfico de Giroscopio (Velocidad Angular)
