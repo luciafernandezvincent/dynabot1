@@ -8,6 +8,9 @@ from isaaclab.app import AppLauncher
 ## ./isaaclab.sh -p -c "import sys; print(sys.executable)"
 
 ## ./isaaclab.sh -p ~/Dynabot/dynabot1/plot_imus_simulacion.py --headless
+
+# export PYTHONPATH=$PYTHONPATH:~/IsaacLab/source
+# export ISAACSIM_PATH=~/.local/share/ov/pkg/isaac-sim-4.0.0
 # 1. Configurar el lanzador (Debe ir PRIMERO obligatoriamente)
 parser = argparse.ArgumentParser(description="Script para comparar IMUs en Dynabot.")
 AppLauncher.add_app_launcher_args(parser)
