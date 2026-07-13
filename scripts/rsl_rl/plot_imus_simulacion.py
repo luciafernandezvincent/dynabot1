@@ -12,6 +12,11 @@ from isaaclab.app import AppLauncher
 # export PYTHONPATH=$PYTHONPATH:~/IsaacLab/source
 # export ISAACSIM_PATH=~/.local/share/ov/pkg/isaac-sim-4.0.0
 # 1. Configurar el lanzador (Debe ir PRIMERO obligatoriamente)
+import sys
+import os
+sys.path.append(os.path.expanduser("~/IsaacLab"))
+sys.path.append(os.path.expanduser("~/IsaacLab/source"))
+
 parser = argparse.ArgumentParser(description="Script para comparar IMUs en Dynabot.")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
