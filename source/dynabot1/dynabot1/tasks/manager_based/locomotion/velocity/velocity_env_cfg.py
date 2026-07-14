@@ -14,7 +14,8 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors import ContactSensorCfg, IMUSensorCfg, RayCasterCfg, patterns
+from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns
+from isaaclab.sensors.imu import ImuCfg
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
@@ -67,11 +68,11 @@ class MySceneCfg(InteractiveSceneCfg):
         mesh_prim_paths=["/World/ground"],
     )
     contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
-    imu_head = IMUSensorCfg(
+    imu_head = ImuCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",
-        offset=IMUSensorCfg.OffsetCfg(pos=(0.3, 0.0, 0.0)),  # Posición más adelante (forward)
-        accel_range=(300.0, 300.0),
-        gyro_range=(2000.0, 2000.0),
+        # offset=ImuCfg.OffsetCfg(pos=(0.3, 0.0, 0.0)),  # Posición más adelante (forward)
+        # accel_range=(300.0, 300.0),
+        # gyro_range=(2000.0, 2000.0),
         update_period=0.01,
     )
     # lights
