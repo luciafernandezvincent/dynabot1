@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 import sys
+from scipy.stats import norm
 
 def plot_imu_data(csv_path, output_dir=None):
     """Plot IMU data from CSV file."""
@@ -20,9 +21,9 @@ def plot_imu_data(csv_path, output_dir=None):
 
     # Angular velocity plot
     ax = axes[0, 0]
-    ax.plot(df.index, df['av_x'], label='X', alpha=0.7)
-    ax.plot(df.index, df['av_y'], label='Y', alpha=0.7)
-    ax.plot(df.index, df['av_z'], label='Z', alpha=0.7)
+    ax.plot(df.index, df['gyro_x'], label='X', alpha=0.7)
+    ax.plot(df.index, df['gyro_y'], label='Y', alpha=0.7)
+    ax.plot(df.index, df['gyro_z'], label='Z', alpha=0.7)
     ax.set_xlabel('Sample')
     ax.set_ylabel('Angular Velocity (rad/s)')
     ax.set_title('Angular Velocity')
@@ -31,9 +32,9 @@ def plot_imu_data(csv_path, output_dir=None):
 
     # Linear acceleration plot
     ax = axes[0, 1]
-    ax.plot(df.index, df['la_x'], label='X', alpha=0.7)
-    ax.plot(df.index, df['la_y'], label='Y', alpha=0.7)
-    ax.plot(df.index, df['la_z'], label='Z', alpha=0.7)
+    ax.plot(df.index, df['accel_x'], label='X', alpha=0.7)
+    ax.plot(df.index, df['accel_y'], label='Y', alpha=0.7)
+    ax.plot(df.index, df['accel_z'], label='Z', alpha=0.7)
     ax.set_xlabel('Sample')
     ax.set_ylabel('Linear Acceleration (m/s²)')
     ax.set_title('Linear Acceleration')
@@ -42,7 +43,7 @@ def plot_imu_data(csv_path, output_dir=None):
 
     # Angular velocity magnitude
     ax = axes[1, 0]
-    av_mag = np.sqrt(df['av_x']**2 + df['av_y']**2 + df['av_z']**2)
+    av_mag = np.sqrt(df['gyro_x']**2 + df['gyro_y']**2 + df['gyro_z']**2)
     ax.plot(av_mag, linewidth=1, color='C0', alpha=0.7)
     ax.fill_between(df.index, av_mag, alpha=0.3, color='C0')
     ax.set_xlabel('Sample')
@@ -52,7 +53,7 @@ def plot_imu_data(csv_path, output_dir=None):
 
     # Linear acceleration magnitude
     ax = axes[1, 1]
-    la_mag = np.sqrt(df['la_x']**2 + df['la_y']**2 + df['la_z']**2)
+    la_mag = np.sqrt(df['accel_x']**2 + df['accel_y']**2 + df['accel_z']**2)
     ax.plot(la_mag, linewidth=1, color='C1', alpha=0.7)
     ax.fill_between(df.index, la_mag, alpha=0.3, color='C1')
     ax.set_xlabel('Sample')
@@ -71,31 +72,40 @@ def plot_imu_data(csv_path, output_dir=None):
     print(f"\nIMU Data Statistics:")
     print(f"Number of samples: {len(df)}")
     print(f"\nAngular Velocity (rad/s):")
-    print(f"  X - Mean: {df['av_x'].mean():.4f}, Std: {df['av_x'].std():.4f}, Range: [{df['av_x'].min():.4f}, {df['av_x'].max():.4f}]")
-    print(f"  Y - Mean: {df['av_y'].mean():.4f}, Std: {df['av_y'].std():.4f}, Range: [{df['av_y'].min():.4f}, {df['av_y'].max():.4f}]")
-    print(f"  Z - Mean: {df['av_z'].mean():.4f}, Std: {df['av_z'].std():.4f}, Range: [{df['av_z'].min():.4f}, {df['av_z'].max():.4f}]")
+    print(f"  X - Mean: {df['gyro_x'].mean():.4f}, Std: {df['gyro_x'].std():.4f}, Range: [{df['gyro_x'].min():.4f}, {df['gyro_x'].max():.4f}]")
+    print(f"  Y - Mean: {df['gyro_y'].mean():.4f}, Std: {df['gyro_y'].std():.4f}, Range: [{df['gyro_y'].min():.4f}, {df['gyro_y'].max():.4f}]")
+    print(f"  Z - Mean: {df['gyro_z'].mean():.4f}, Std: {df['gyro_z'].std():.4f}, Range: [{df['gyro_z'].min():.4f}, {df['gyro_z'].max():.4f}]")
     print(f"\nLinear Acceleration (m/s²):")
-    print(f"  X - Mean: {df['la_x'].mean():.4f}, Std: {df['la_x'].std():.4f}, Range: [{df['la_x'].min():.4f}, {df['la_x'].max():.4f}]")
-    print(f"  Y - Mean: {df['la_y'].mean():.4f}, Std: {df['la_y'].std():.4f}, Range: [{df['la_y'].min():.4f}, {df['la_y'].max():.4f}]")
-    print(f"  Z - Mean: {df['la_z'].mean():.4f}, Std: {df['la_z'].std():.4f}, Range: [{df['la_z'].min():.4f}, {df['la_z'].max():.4f}]")
+    print(f"  X - Mean: {df['accel_x'].mean():.4f}, Std: {df['accel_x'].std():.4f}, Range: [{df['accel_x'].min():.4f}, {df['accel_x'].max():.4f}]")
+    print(f"  Y - Mean: {df['accel_y'].mean():.4f}, Std: {df['accel_y'].std():.4f}, Range: [{df['accel_y'].min():.4f}, {df['accel_y'].max():.4f}]")
+    print(f"  Z - Mean: {df['accel_z'].mean():.4f}, Std: {df['accel_z'].std():.4f}, Range: [{df['accel_z'].min():.4f}, {df['accel_z'].max():.4f}]")
 
+    mean=df['gyro_x'].mean()
+    std=df['gyro_x'].std()
+    x = np.linspace( mean - 4 * std, mean + 4 * std, 1000 ) # Densidad de probabilidad de la normal 
+    y = norm.pdf(x, loc=mean, scale=std) 
+    plt.figure()
+    plt.plot(x, y, label=f"N({mean}, {std})")
+    plt.hist(df['gyro_x'], density=True)
     plt.show()
+
+
 
 if __name__ == "__main__":
     # Default to most recent imu.csv with data
     # sensor_results_dir = Path(__file__).parent.parent.parent / "sensor_results"
-    sensor_results_dir = Path(__file__).parent.parent.parent /"sensor_results/20260415-140421"
-    if len(sys.argv) > 1:
-        csv_path = sys.argv[1]
-    else:
-        # Find the most recent imu.csv
-        imu_files = list(sensor_results_dir.glob("imu.csv"))
-        imu_files_with_data = [f for f in imu_files if f.stat().st_size > 100]
-        if imu_files_with_data:
-            csv_path = sorted(imu_files_with_data)[-1]
-        else:
-            print("No imu.csv files found with data")
-            sys.exit(1)
-
+    # sensor_results_dir = Path(__file__).parent.parent.parent /"sensor_results/20260415-140421"
+    # if len(sys.argv) > 1:
+    #     csv_path = sys.argv[1]
+    # else:
+    #     # Find the most recent imu.csv
+    #     imu_files = list(sensor_results_dir.glob("imu.csv"))
+    #     imu_files_with_data = [f for f in imu_files if f.stat().st_size > 100]
+    #     if imu_files_with_data:
+    #         csv_path = sorted(imu_files_with_data)[-1]
+    #     else:
+    #         print("No imu.csv files found with data")
+    #         sys.exit(1)
+    csv_path = "dynabot1/sensor_results/log_imu_static2.csv"
     print(f"Plotting IMU data from: {csv_path}")
     plot_imu_data(csv_path)
