@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import torch
 from dataclasses import MISSING
 
 import isaaclab.sim as sim_utils
@@ -19,6 +20,7 @@ from isaaclab.sensors.imu import ImuCfg
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
+from isaaclab.utils.noise import AdditiveGaussianNoiseCfg as Gnoise
 
 import dynabot1.tasks.manager_based.locomotion.velocity.mdp as mdp
 
@@ -127,7 +129,15 @@ class ObservationsCfg:
 
         # observation terms (order preserved)
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.3, n_max=0.3))
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel,
+            noise=Gnoise(
+                mean=torch.tensor([0.0, 0.0, 0.0]),
+                std=torch.deg2rad(torch.tensor([0.0161, 0.0130, 0.0160])),
+            ),
+        )
+        #base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
+        
         projected_gravity = ObsTerm(
             func=mdp.projected_gravity,
             noise=Unoise(n_min=-0.05, n_max=0.05),

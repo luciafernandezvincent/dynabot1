@@ -16,77 +16,82 @@ def plot_imu_data(csv_path, output_dir=None):
         output_dir.mkdir(parents=True, exist_ok=True)
 
     # Create figure with subplots
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    fig.suptitle(f'IMU Data from {Path(csv_path).parent.name}', fontsize=16)
+    fig, axes = plt.subplots(1, 2, figsize=(18, 7))
+    fig.suptitle(f'IMU Measurements', fontsize=16)
 
     # Angular velocity plot
-    ax = axes[0, 0]
+    ax = axes[0]
     ax.plot(df.index, df['gyro_x'], label='X', alpha=0.7)
     ax.plot(df.index, df['gyro_y'], label='Y', alpha=0.7)
     ax.plot(df.index, df['gyro_z'], label='Z', alpha=0.7)
     ax.set_xlabel('Sample')
-    ax.set_ylabel('Angular Velocity (rad/s)')
+    ax.set_ylabel('Angular Velocity (deg/s)')
     ax.set_title('Angular Velocity')
     ax.legend()
     ax.grid(True, alpha=0.3)
 
     # Linear acceleration plot
-    ax = axes[0, 1]
+    ax = axes[1]
     ax.plot(df.index, df['accel_x'], label='X', alpha=0.7)
     ax.plot(df.index, df['accel_y'], label='Y', alpha=0.7)
     ax.plot(df.index, df['accel_z'], label='Z', alpha=0.7)
     ax.set_xlabel('Sample')
-    ax.set_ylabel('Linear Acceleration (m/s²)')
+    ax.set_ylabel('Linear Acceleration (g)')
     ax.set_title('Linear Acceleration')
     ax.legend()
-    ax.grid(True, alpha=0.3)
-
-    # Angular velocity magnitude
-    ax = axes[1, 0]
-    av_mag = np.sqrt(df['gyro_x']**2 + df['gyro_y']**2 + df['gyro_z']**2)
-    ax.plot(av_mag, linewidth=1, color='C0', alpha=0.7)
-    ax.fill_between(df.index, av_mag, alpha=0.3, color='C0')
-    ax.set_xlabel('Sample')
-    ax.set_ylabel('Magnitude (rad/s)')
-    ax.set_title('Angular Velocity Magnitude')
-    ax.grid(True, alpha=0.3)
-
-    # Linear acceleration magnitude
-    ax = axes[1, 1]
-    la_mag = np.sqrt(df['accel_x']**2 + df['accel_y']**2 + df['accel_z']**2)
-    ax.plot(la_mag, linewidth=1, color='C1', alpha=0.7)
-    ax.fill_between(df.index, la_mag, alpha=0.3, color='C1')
-    ax.set_xlabel('Sample')
-    ax.set_ylabel('Magnitude (m/s²)')
-    ax.set_title('Linear Acceleration Magnitude')
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
 
     # Save figure
-    output_path = output_dir / 'imu_plot.png'
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    output_path = output_dir / 'imu_measurements.png'
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Plot saved to: {output_path}")
 
     # Print statistics
     print(f"\nIMU Data Statistics:")
     print(f"Number of samples: {len(df)}")
-    print(f"\nAngular Velocity (rad/s):")
+    print(f"\nAngular Velocity (deg/s):")
     print(f"  X - Mean: {df['gyro_x'].mean():.4f}, Std: {df['gyro_x'].std():.4f}, Range: [{df['gyro_x'].min():.4f}, {df['gyro_x'].max():.4f}]")
     print(f"  Y - Mean: {df['gyro_y'].mean():.4f}, Std: {df['gyro_y'].std():.4f}, Range: [{df['gyro_y'].min():.4f}, {df['gyro_y'].max():.4f}]")
     print(f"  Z - Mean: {df['gyro_z'].mean():.4f}, Std: {df['gyro_z'].std():.4f}, Range: [{df['gyro_z'].min():.4f}, {df['gyro_z'].max():.4f}]")
-    print(f"\nLinear Acceleration (m/s²):")
+    print(f"\nLinear Acceleration (g):")
     print(f"  X - Mean: {df['accel_x'].mean():.4f}, Std: {df['accel_x'].std():.4f}, Range: [{df['accel_x'].min():.4f}, {df['accel_x'].max():.4f}]")
     print(f"  Y - Mean: {df['accel_y'].mean():.4f}, Std: {df['accel_y'].std():.4f}, Range: [{df['accel_y'].min():.4f}, {df['accel_y'].max():.4f}]")
     print(f"  Z - Mean: {df['accel_z'].mean():.4f}, Std: {df['accel_z'].std():.4f}, Range: [{df['accel_z'].min():.4f}, {df['accel_z'].max():.4f}]")
 
-    mean=df['gyro_x'].mean()
-    std=df['gyro_x'].std()
-    x = np.linspace( mean - 4 * std, mean + 4 * std, 1000 ) # Densidad de probabilidad de la normal 
-    y = norm.pdf(x, loc=mean, scale=std) 
-    plt.figure()
-    plt.plot(x, y, label=f"N({mean}, {std})")
-    plt.hist(df['gyro_x'], density=True)
+    # Histograms with fitted normal distribution for each IMU variable
+    variables = ['gyro_x', 'gyro_y', 'gyro_z', 'accel_x', 'accel_y', 'accel_z']
+    xlabels = {
+        'gyro_x': 'Angular velocity x (deg/s)',
+        'gyro_y': 'Angular velocity y (deg/s)',
+        'gyro_z': 'Angular velocity z (deg/s)',
+        'accel_x': 'Linear acceleration x (g)',
+        'accel_y': 'Linear acceleration y (g)',
+        'accel_z': 'Linear acceleration z (g)',
+    }
+    fig_hist, axes_hist = plt.subplots(2, 3, figsize=(18, 10))
+    fig_hist.suptitle(f'IMU Measurements Distributions', fontsize=16)
+
+    for ax, var in zip(axes_hist.flat, variables):
+        mean = df[var].mean()
+        std = df[var].std()
+        x = np.linspace(mean - 4 * std, mean + 4 * std, 1000)
+        y = norm.pdf(x, loc=mean, scale=std)
+        ax.hist(df[var], density=True, alpha=0.6, color='C0')
+        ax.plot(x, y, color='C1', label=f"N({mean:.4f}, {std:.4f})")
+        ax.set_title(xlabels[var])
+        ax.set_xlabel(xlabels[var])
+        ax.set_ylabel('Density')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    hist_output_path = output_dir / 'imu_histograms.png'
+    plt.savefig(hist_output_path, dpi=300, bbox_inches='tight')
+    print(f"Histogram plot saved to: {hist_output_path}")
+
     plt.show()
 
 
@@ -106,6 +111,6 @@ if __name__ == "__main__":
     #     else:
     #         print("No imu.csv files found with data")
     #         sys.exit(1)
-    csv_path = "dynabot1/sensor_results/log_imu_static2.csv"
+    csv_path = "sensor_results/log_imu_static_100.csv"
     print(f"Plotting IMU data from: {csv_path}")
     plot_imu_data(csv_path)
