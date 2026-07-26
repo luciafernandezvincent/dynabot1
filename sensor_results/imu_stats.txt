@@ -1,0 +1,8 @@
+Number of samples: 10594
+
+gyro_x - Mean: 2.2930277053, Std: 0.0161323007
+gyro_y - Mean: -0.8582327081, Std: 0.0130425803
+gyro_z - Mean: 0.4831709816, Std: 0.0160162189
+accel_x - Mean: -0.0082099141, Std: 0.0003486358
+accel_y - Mean: 0.9982369516, Std: 0.0003629253
+accel_z - Mean: -0.0181648322, Std: 0.0003639676

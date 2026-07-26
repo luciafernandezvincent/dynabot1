@@ -60,8 +60,16 @@ def plot_imu_data(csv_path, output_dir=None):
     print(f"  Y - Mean: {df['accel_y'].mean():.4f}, Std: {df['accel_y'].std():.4f}, Range: [{df['accel_y'].min():.4f}, {df['accel_y'].max():.4f}]")
     print(f"  Z - Mean: {df['accel_z'].mean():.4f}, Std: {df['accel_z'].std():.4f}, Range: [{df['accel_z'].min():.4f}, {df['accel_z'].max():.4f}]")
 
-    # Histograms with fitted normal distribution for each IMU variable
+    # Save mean/std of each variable to a .txt file with 10 decimals
     variables = ['gyro_x', 'gyro_y', 'gyro_z', 'accel_x', 'accel_y', 'accel_z']
+    stats_output_path = output_dir / 'imu_stats.txt'
+    with open(stats_output_path, 'w') as f:
+        f.write(f"Number of samples: {len(df)}\n\n")
+        for var in variables:
+            f.write(f"{var} - Mean: {df[var].mean():.10f}, Std: {df[var].std():.10f}\n")
+    print(f"Stats saved to: {stats_output_path}")
+
+    # Histograms with fitted normal distribution for each IMU variable
     xlabels = {
         'gyro_x': 'Angular velocity x (deg/s)',
         'gyro_y': 'Angular velocity y (deg/s)',
@@ -92,7 +100,7 @@ def plot_imu_data(csv_path, output_dir=None):
     plt.savefig(hist_output_path, dpi=300, bbox_inches='tight')
     print(f"Histogram plot saved to: {hist_output_path}")
 
-    plt.show()
+    #plt.show()
 
 
 
