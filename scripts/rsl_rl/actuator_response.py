@@ -25,6 +25,7 @@ parser.add_argument("--test_steps", type=int, default=1000) # para calc segundos
 parser.add_argument("--step_value", type=float, default=0.4)
 parser.add_argument("--sine_amplitude", type=float, default=0.4)
 parser.add_argument("--sine_frequency", type=float, default=0.5)
+parser.add_argument("--action-repeat", type=int, default=1, help="Number of times to repeat each action (for latency simulation)")
 
 cli_args.add_rsl_rl_args(parser)
 AppLauncher.add_app_launcher_args(parser)
@@ -141,13 +142,25 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     logs = []
     timestep = 0
     physics_dt = env.unwrapped.physics_dt
-    
 
+    # Action buffer for repetition
+    repeat_counter = 0  # Will trigger generation of first action
+    action_repeat = args_cli.action_repeat
+
+    # Initialize action buffer with zeros (will be overwritten immediately)
+    action_buffer = torch.zeros(args_cli.num_envs, env.num_actions, device=env.unwrapped.device)
+
+    if action_repeat > 1:
+        print(f"\n[INFO] Action repetition enabled: {action_repeat}x (each action applied {action_repeat} times)")
+    else:
+        print(f"\n[INFO] Action repetition disabled (normal mode)")
 
     print("\n" + "="*50)
     print(f"[ANÁLISIS DE FRECUENCIA DE DATOS]")
     print(f"-> La física calcula a:    {1.0 / physics_dt:.1f} Hz (dt: {physics_dt} s)")
     print(f"-> Tu gráfico registrará a: {1.0 / dt:.1f} Hz (dt: {dt} s)")
+    if action_repeat > 1:
+        print(f"-> Repetición de acciones:  {action_repeat}x (latencia simulada: {action_repeat * dt:.3f}s)")
     print("="*50 + "\n")
 
     measured_joint_name = robot.joint_names[args_cli.action_indices[0]]
@@ -156,24 +169,34 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         t = timestep * dt
 
         with torch.inference_mode():
-            offset = 0.0
-            for part, off in initial_pos.items():
-                if part in measured_joint_name: #esto depende de que solo haya un joint name
-                    offset = off
- 
-            step_value = ((args_cli.step_value*torch.pi/180) - offset)/0.25
-            actions = build_manual_action(
-                t=t,
-                num_envs=env.unwrapped.num_envs,
-                action_dim=env.num_actions,
-                device=env.unwrapped.device,
-                action_indices=args_cli.action_indices,
-                mode=args_cli.test_mode,
-                step_value=step_value,
-                sine_amplitude=args_cli.sine_amplitude,
-                sine_frequency=args_cli.sine_frequency,
-                offset=offset
-            )
+            # Generate new action only when repeat counter resets
+            if repeat_counter == 0:
+                offset = 0.0
+                for part, off in initial_pos.items():
+                    if part in measured_joint_name: #esto depende de que solo haya un joint name
+                        offset = off
+
+                step_value = ((args_cli.step_value*torch.pi/180) - offset)/0.25
+                action_buffer = build_manual_action(
+                    t=t,
+                    num_envs=env.unwrapped.num_envs,
+                    action_dim=env.num_actions,
+                    device=env.unwrapped.device,
+                    action_indices=args_cli.action_indices,
+                    mode=args_cli.test_mode,
+                    step_value=step_value,
+                    sine_amplitude=args_cli.sine_amplitude,
+                    sine_frequency=args_cli.sine_frequency,
+                    offset=offset
+                )
+
+            # Use buffered action
+            actions = action_buffer
+
+            # Update repeat counter
+            repeat_counter += 1
+            if repeat_counter >= action_repeat:
+                repeat_counter = 0
 
             obs, _, dones, _ = env.step(actions)
             data = robot.data
