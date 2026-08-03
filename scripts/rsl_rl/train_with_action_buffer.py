@@ -112,7 +112,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
 
-    # ✅ ADD ACTION BUFFER WRAPPER HERE
+    # ADD ACTION BUFFER WRAPPER HERE
     if args_cli.action_repeat > 1:
         env = ActionBufferWrapper(env, action_repeat=args_cli.action_repeat)
         logger.info(f"[INFO] Action buffer enabled: {args_cli.action_repeat}x repetition")
