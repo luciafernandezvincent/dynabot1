@@ -25,7 +25,7 @@ parser.add_argument("--test_steps", type=int, default=1000) # para calc segundos
 parser.add_argument("--step_value", type=float, default=0.4)
 parser.add_argument("--sine_amplitude", type=float, default=0.4)
 parser.add_argument("--sine_frequency", type=float, default=0.5)
-parser.add_argument("--action-repeat", type=int, default=1, help="Number of times to repeat each action (for latency simulation)")
+parser.add_argument("--action-delay", type=int, default=1)
 
 cli_args.add_rsl_rl_args(parser)
 AppLauncher.add_app_launcher_args(parser)
@@ -122,10 +122,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
 
-    # Apply action delay wrapper if action_repeat > 1
-    if args_cli.action_repeat > 1:
-        env = ActionDelayWrapper(env, delay_steps=args_cli.action_repeat)
-        print(f"[INFO] Action delay enabled: {args_cli.action_repeat} steps delay")
+    # Apply action delay wrapper if action_delay > 1
+    if args_cli.action_delay > 1:
+        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay)
+        print(f"[INFO] Action delay enabled: {args_cli.action_delay} steps delay")
 
     dt = env.unwrapped.step_dt
     robot = env.unwrapped.scene[args_cli.robot_name]
@@ -154,8 +154,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     print(f"[ANÁLISIS DE FRECUENCIA DE DATOS]")
     print(f"-> La física calcula a:    {1.0 / physics_dt:.1f} Hz (dt: {physics_dt} s)")
     print(f"-> Tu gráfico registrará a: {1.0 / dt:.1f} Hz (dt: {dt} s)")
-    if args_cli.action_repeat > 1:
-        print(f"-> Repetición de acciones:  {args_cli.action_repeat}x (latencia simulada: {args_cli.action_repeat * dt:.3f}s)")
+    if args_cli.action_delay > 1:
+        print(f"-> Repetición de acciones:  {args_cli.action_delay}x (latencia simulada: {args_cli.action_delay * dt:.3f}s)")
     print("="*50 + "\n")
 
     measured_joint_name = robot.joint_names[args_cli.action_indices[0]]
