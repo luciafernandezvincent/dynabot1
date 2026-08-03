@@ -1,5 +1,5 @@
 """Environment wrappers for dynabot1."""
 
-from .action_buffer import ActionBufferWrapper
+from .action_buffer import ActionDelayWrapper
 
-__all__ = ["ActionBufferWrapper"]
+__all__ = ["ActionDelayWrapper"]

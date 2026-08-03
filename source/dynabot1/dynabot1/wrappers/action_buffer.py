@@ -1,32 +1,41 @@
-"""Wrapper to add action repetition/buffering for introducing latency in simulation."""
+"""Wrapper to add action delay for introducing latency in simulation."""
 
 import torch
+from collections import deque
 
 
-class ActionBufferWrapper:
+class ActionDelayWrapper:
     """
-    Wraps any environment to repeat actions N times before accepting new actions.
-    Useful for simulating latency or action delays.
+    Wraps any environment to introduce action delay/latency.
+
+    New actions are queued but executed X steps later.
+    Useful for simulating communication delay or processing latency.
 
     Example:
         env = gym.make(task, cfg=env_cfg)
-        env = ActionBufferWrapper(env, action_repeat=3)
+        env = ActionDelayWrapper(env, delay_steps=3)
 
-        # Now each action from policy is repeated 3 times before new action is sampled
+        # Action sent at step 0 is executed at step 3
+        # Action sent at step 1 is executed at step 4
+        # etc.
     """
 
-    def __init__(self, env, action_repeat: int = 1):
+    def __init__(self, env, delay_steps: int = 1, default_action="zeros"):
         """
-        Initialize action buffer wrapper.
+        Initialize action delay wrapper.
 
         Args:
-            env: The base environment to wrap (any gymnasium-compatible environment)
-            action_repeat: Number of times to repeat each action (default: 1 = no repeat)
+            env: The base environment to wrap
+            delay_steps: Number of steps to delay actions (default: 1)
+            default_action: What to send before first actions arrive
+                - "zeros": Send zero action
+                - "hold": Hold last action (requires first action to initialize)
         """
         self.env = env
-        self.action_repeat = action_repeat
-        self.action_buffer = None
-        self.repeat_counter = 0
+        self.delay_steps = max(1, delay_steps)
+        self.default_action = default_action
+        self.action_queue = deque(maxlen=delay_steps)
+        self.last_action = None
 
         # Expose common environment attributes
         if hasattr(env, 'observation_space'):
@@ -39,48 +48,67 @@ class ActionBufferWrapper:
             self.metadata = env.metadata
 
     def reset(self, seed=None, options=None):
-        """Reset environment and clear action buffer."""
-        self.action_buffer = None
-        self.repeat_counter = 0
+        """Reset environment and clear action queue."""
+        self.action_queue.clear()
+        self.last_action = None
         return self.env.reset(seed=seed, options=options)
 
     def step(self, actions):
         """
-        Step environment with action repetition.
-
-        Supports both single and vectorized (batch) actions.
+        Step environment with action delay.
 
         Args:
-            actions: Actions from policy (can be single action or batch)
+            actions: Actions from policy (will be executed delay_steps later)
 
         Returns:
             observations, rewards, dones, truncated, info
         """
-        # Store new actions on first call or when repeat counter resets
-        if self.repeat_counter == 0:
-            if isinstance(actions, torch.Tensor):
-                self.action_buffer = actions.clone()
+        # Queue the new action
+        self.action_queue.append(actions)
+
+        # Get action to execute (from front of queue or default)
+        if len(self.action_queue) == self.delay_steps:
+            # Queue is full, execute oldest action
+            action_to_execute = self.action_queue[0]  # oldest
+            self.last_action = action_to_execute
+        else:
+            # Queue not full yet, use default action
+            if self.default_action == "zeros":
+                # Create zero action with same shape as input
+                if isinstance(actions, torch.Tensor):
+                    action_to_execute = torch.zeros_like(actions)
+                else:
+                    action_to_execute = (
+                        actions * 0 if hasattr(actions, '__mul__') else None
+                    )
+            elif self.default_action == "hold" and self.last_action is not None:
+                action_to_execute = self.last_action
             else:
-                self.action_buffer = actions.copy() if hasattr(actions, 'copy') else actions
+                action_to_execute = self._create_zero_action(actions)
 
-        # Step environment with buffered action
-        obs, reward, done, truncated, info = self.env.step(self.action_buffer)
-
-        # Update counter
-        self.repeat_counter += 1
-        if self.repeat_counter >= self.action_repeat:
-            self.repeat_counter = 0
+        # Step environment with delayed action
+        obs, reward, done, truncated, info = self.env.step(action_to_execute)
 
         return obs, reward, done, truncated, info
 
-    def set_action_repeat(self, repeat: int):
-        """Change action repeat dynamically."""
-        self.action_repeat = max(1, repeat)
-        self.repeat_counter = 0
+    def _create_zero_action(self, action_template):
+        """Create zero action with same shape as template."""
+        if isinstance(action_template, torch.Tensor):
+            return torch.zeros_like(action_template)
+        elif hasattr(action_template, 'shape'):
+            import numpy as np
+            return np.zeros_like(action_template)
+        else:
+            return action_template * 0
 
-    def get_action_repeat(self):
-        """Get current action repeat value."""
-        return self.action_repeat
+    def set_delay_steps(self, delay: int):
+        """Change delay dynamically."""
+        self.delay_steps = max(1, delay)
+        self.action_queue = deque(self.action_queue, maxlen=delay)
+
+    def get_delay_steps(self):
+        """Get current delay value."""
+        return self.delay_steps
 
     def render(self):
         """Render environment if supported."""
