@@ -69,7 +69,7 @@ DYNABOT_1_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.0),
+        pos=(0.0, 0.0, 1.0),
         joint_pos={
             ".*_shoulder": 0.0,
             ".*shoulder_to_arm": - 0.79,
@@ -97,7 +97,7 @@ DYNABOT_1_CFG = ArticulationCfg(
             velocity_limit=21.0,
             stiffness=26.0,
             damping=2.0,
-            friction=0.5,
+            friction=0.2,
             armature=0.06,
         ),
         "shoulder_to_arm": DCMotorCfg(

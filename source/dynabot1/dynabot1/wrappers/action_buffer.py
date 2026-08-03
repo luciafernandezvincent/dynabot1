@@ -87,9 +87,9 @@ class ActionDelayWrapper:
                 action_to_execute = self._create_zero_action(actions)
 
         # Step environment with delayed action
-        obs, reward, done, truncated, info = self.env.step(action_to_execute)
+        obs, reward, done, info = self.env.step(action_to_execute)
 
-        return obs, reward, done, truncated, info
+        return obs, reward, done, info
 
     def _create_zero_action(self, action_template):
         """Create zero action with same shape as template."""

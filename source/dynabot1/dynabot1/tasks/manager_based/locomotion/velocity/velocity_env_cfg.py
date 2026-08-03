@@ -132,8 +132,8 @@ class ObservationsCfg:
         base_ang_vel = ObsTerm(
             func=mdp.base_ang_vel,
             noise=Gnoise(
-                mean=torch.tensor([0.0, 0.0, 0.0]),
-                std=torch.deg2rad(torch.tensor([0.0161, 0.0130, 0.0160])),
+                mean=0.0,
+                std=math.radians(0.015)
             ),
         )
         #base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))

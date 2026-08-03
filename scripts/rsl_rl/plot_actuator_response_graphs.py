@@ -146,10 +146,10 @@ def plot_joint_position(sim_joint: str, real_key: str, csv_key: str):
     print(f"[SAVED] {out_path}")
 
 def main():
-    for sim_joint, real_key, csv_key in JOINT_MAP:
-        plot_joint_position(sim_joint, real_key, csv_key)
+    # for sim_joint, real_key, csv_key in JOINT_MAP:
+    #     plot_joint_position(sim_joint, real_key, csv_key)
 
-    # plot_joint_position("base_to_front_right_shoulder", "FRshoulder", "FRshoulder")
+    plot_joint_position("base_to_front_right_shoulder", "FRshoulder", "FRshoulder")
     # plot_joint_position("front_right_shoulder_to_arm",  "FRarm",      "FRarm")
     # plot_joint_position("front_right_arm_to_hand", "FRfoot",     "FRfoot")
 
