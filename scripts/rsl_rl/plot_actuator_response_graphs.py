@@ -49,8 +49,7 @@ def load_sim(sim_joint: str, sim_joint_graph, t0: float | None = None):
     targets = df["joint_pos_target"].to_numpy(dtype=float)
 
     if t0 is None:
-        step_idx = find_step_index(targets) # First sample where joint_pos_target changes from initial
-        t0 = time[step_idx]
+        t0 = time[0]  # el csv ya arranca en el momento de la primera accion
     step_idx = int(np.argmin(np.abs(time - t0)))
     pos0 = df["joint_pos"].iloc[step_idx]
     target0 = targets[step_idx]

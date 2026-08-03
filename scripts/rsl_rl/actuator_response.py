@@ -64,11 +64,14 @@ import dynabot1.tasks  # noqa: F401
 from dynabot1.wrappers import ActionDelayWrapper
 
 
+STEP_MODE_DELAY = 3.0  # segundos antes de mandar la primera accion en modo "step"
+
+
 def build_manual_action(t,num_envs, action_dim, device, action_indices, mode, step_value, sine_amplitude, sine_frequency, offset):
     actions = torch.zeros(num_envs, action_dim, device=device)
 
     if mode == "step":
-        if t < 3.0:
+        if t < STEP_MODE_DELAY:
             value = (0.0 - offset)/0.25 #primero tendria que ir al 0 (considerando el initial pose) y desp paso al movimiento buscando
         else:
             value = step_value
@@ -187,28 +190,29 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             obs, _, dones, _ = env.step(actions)
             data = robot.data
 
-            for joint_name, joint_id in zip(resolved_joint_names, joint_ids):
-                row = {
-                    "step": timestep,
-                    "time": t,
-                    "joint": joint_name,
-                    "joint_id": int(joint_id),
-                    "joint_pos": data.joint_pos[0, joint_id].item(),
-                    "joint_vel": data.joint_vel[0, joint_id].item(),
-                }
-                if data.joint_pos_target is not None:
-                    row["joint_pos_target"] = data.joint_pos_target[0, joint_id].item()
-                if data.joint_vel_target is not None:
-                    row["joint_vel_target"] = data.joint_vel_target[0, joint_id].item()
-                if data.joint_effort_target is not None:
-                    row["joint_effort_target"] = data.joint_effort_target[0, joint_id].item()
-                if data.applied_torque is not None:
-                    row["applied_torque"] = data.applied_torque[0, joint_id].item()
-                if data.computed_torque is not None:
-                    row["computed_torque"] = data.computed_torque[0, joint_id].item()
-                for i in range(actions.shape[1]):
-                    row[f"action_{i}"] = actions[0, i].item()
-                logs.append(row)
+            if args_cli.test_mode != "step" or t >= STEP_MODE_DELAY:
+                for joint_name, joint_id in zip(resolved_joint_names, joint_ids):
+                    row = {
+                        "step": timestep,
+                        "time": t,
+                        "joint": joint_name,
+                        "joint_id": int(joint_id),
+                        "joint_pos": data.joint_pos[0, joint_id].item(),
+                        "joint_vel": data.joint_vel[0, joint_id].item(),
+                    }
+                    if data.joint_pos_target is not None:
+                        row["joint_pos_target"] = data.joint_pos_target[0, joint_id].item()
+                    if data.joint_vel_target is not None:
+                        row["joint_vel_target"] = data.joint_vel_target[0, joint_id].item()
+                    if data.joint_effort_target is not None:
+                        row["joint_effort_target"] = data.joint_effort_target[0, joint_id].item()
+                    if data.applied_torque is not None:
+                        row["applied_torque"] = data.applied_torque[0, joint_id].item()
+                    if data.computed_torque is not None:
+                        row["computed_torque"] = data.computed_torque[0, joint_id].item()
+                    for i in range(actions.shape[1]):
+                        row[f"action_{i}"] = actions[0, i].item()
+                    logs.append(row)
 
         timestep += 1
         if timestep >= args_cli.test_steps:
