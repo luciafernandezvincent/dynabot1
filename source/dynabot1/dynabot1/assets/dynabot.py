@@ -69,7 +69,7 @@ DYNABOT_1_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 1.0),
+        pos=(0.0, 0.0, 0.3),
         joint_pos={
             ".*_shoulder": 0.0,
             ".*shoulder_to_arm": - 0.79,
@@ -95,30 +95,30 @@ DYNABOT_1_CFG = ArticulationCfg(
             effort_limit=14.5,
             saturation_effort=20.5,
             velocity_limit=21.0,
-            stiffness=45.0,
-            damping=4.5,
-            friction=0.0,
-            armature=0.04,
+            stiffness=90.0,
+            damping=5.5,
+            friction=0.1,
+            armature=0.03,
         ),
         "shoulder_to_arm": DCMotorCfg(
             joint_names_expr=[".*shoulder_to_arm"],
             effort_limit=14.5,
             saturation_effort=20.5,
             velocity_limit=21.0,
-            stiffness=24,  # Aumentamos para que empiece a moverse más rápido
+            stiffness=28,  # Aumentamos para que empiece a moverse más rápido
             damping=1.85,     # Aumentamos más que la rigidez para frenar el "pasarse"
-            friction=0.7,
-            armature=0.05,   # Un ligero aumento para dar realismo a la inercia del motor
+            friction=0.0,
+            armature=0.04,   # Un ligero aumento para dar realismo a la inercia del motor
         ),
         "arm_to_hand": DCMotorCfg(
             joint_names_expr=[".*arm_to_hand"],
             effort_limit=14.5,
             saturation_effort=20.5,
             velocity_limit=21.0,
-            stiffness=26.0,
-            damping=1.5,
-            friction=0.5,
-            armature=0.04,
+            stiffness=100.0,
+            damping=3.5,
+            friction=0.1,
+            armature=0.03,
         ),
         
     },
