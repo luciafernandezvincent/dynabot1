@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Training script with action buffer/repetition for RL-Games.
+Training script with action delay wrapper for RSL-RL.
 
-This demonstrates how to use the ActionBufferWrapper to introduce
-action delays/latency in simulation.
+Introduces action latency: actions are queued and executed X steps later.
 
 Usage:
-    python3 train_with_action_buffer.py --task Dyna1-GraphArtRes-v0 --action-repeat 3 --num_envs 256
+    python3 train_delay.py --task Dyna1-GraphArtRes-v0 --action-delay 3
+    python3 train_delay.py --task Dyna1-GraphArtRes-v0  # default: no delay
 """
 
 import argparse
@@ -16,21 +16,25 @@ from isaaclab.app import AppLauncher
 
 import cli_args  # isort: skip
 
-parser = argparse.ArgumentParser(description="Train RL agent with action buffer (RL-Games).")
+parser = argparse.ArgumentParser(description="Train RL agent with action delay (RSL-RL).")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
 parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
 parser.add_argument("--video_interval", type=int, default=2000, help="Interval between video recordings (in steps).")
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument(
-    "--agent", type=str, default="rl_games_cfg_entry_point", help="Name of the RL agent configuration entry point."
+    "--agent", type=str, default="rsl_rl_cfg_entry_point", help="Name of the RL agent configuration entry point."
 )
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
-parser.add_argument("--checkpoint", type=str, default=None, help="Path to model checkpoint.")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
-
-# Action buffer argument
-parser.add_argument("--action-repeat", type=int, default=1, help="Number of times to repeat each action (for latency simulation)")
+parser.add_argument(
+    "--distributed", action="store_true", default=False, help="Run training with multiple GPUs or nodes."
+)
+parser.add_argument("--export_io_descriptors", action="store_true", default=False, help="Export IO descriptors.")
+parser.add_argument(
+    "--ray-proc-id", "-rid", type=int, default=None, help="Automatically configured by Ray integration, otherwise None."
+)
+parser.add_argument("--action-delay", type=int, default=1, help="Number of steps to delay actions (1 = no delay)")
 
 cli_args.add_rsl_rl_args(parser)
 AppLauncher.add_app_launcher_args(parser)
@@ -55,10 +59,6 @@ import time
 from datetime import datetime
 
 import gymnasium as gym
-from rl_games.common import env_configurations, vecenv
-from rl_games.common.algo_observer import IsaacAlgoObserver
-from rl_games.torch_runner import Runner
-
 from isaaclab.envs import (
     DirectMARLEnv,
     DirectMARLEnvCfg,
@@ -66,17 +66,14 @@ from isaaclab.envs import (
     ManagerBasedRLEnvCfg,
     multi_agent_to_single_agent,
 )
-from isaaclab.utils.assets import retrieve_file_path
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.io import dump_yaml
-
-from isaaclab_rl.rl_games import MultiObserver, PbtAlgoObserver, RlGamesGpuEnv, RlGamesVecEnvWrapper
+from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper
 
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
-# Import action buffer wrapper
-from dynabot1.tasks.manager_based.locomotion.velocity.action_buffer_wrapper import ActionBufferWrapper
+from dynabot1.wrappers import ActionDelayWrapper
 
 import dynabot1.tasks  # noqa: F401
 
@@ -84,8 +81,9 @@ logger = logging.getLogger(__name__)
 
 
 @hydra_task_config(args_cli.task, args_cli.agent)
-def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: dict):
-    """Train with RL-Games agent and action buffer."""
+def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg):
+    """Train with RSL-RL agent and action delay."""
+    # override configurations with non-hydra CLI arguments
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
@@ -97,10 +95,32 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         args_cli.max_iterations if args_cli.max_iterations is not None else agent_cfg["params"]["config"]["max_epochs"]
     )
 
-    config_name = agent_cfg["params"]["config"]["name"]
-    log_root_path = os.path.abspath(os.path.join("logs", "rl_games", config_name))
-    log_dir = agent_cfg["params"]["config"].get("full_experiment_name", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    # set the IO descriptors export flag if requested
+    if isinstance(env_cfg, ManagerBasedRLEnvCfg):
+        env_cfg.export_io_descriptors = args_cli.export_io_descriptors
+    else:
+        logger.warning(
+            "IO descriptors are only supported for manager based RL environments. No IO descriptors will be exported."
+        )
 
+    # multi-gpu training config
+    if args_cli.distributed:
+        agent_cfg["params"]["seed"] += app_launcher.global_rank
+        agent_cfg["params"]["config"]["device"] = f"cuda:{app_launcher.local_rank}"
+        agent_cfg["params"]["config"]["device_name"] = f"cuda:{app_launcher.local_rank}"
+        agent_cfg["params"]["config"]["multi_gpu"] = True
+        env_cfg.sim.device = f"cuda:{app_launcher.local_rank}"
+
+    env_cfg.seed = agent_cfg["params"]["seed"]
+
+    # specify directory for logging experiments
+    config_name = agent_cfg["params"]["config"]["name"]
+    log_root_path = os.path.join("logs", "rsl_rl", config_name)
+    log_root_path = os.path.abspath(log_root_path)
+
+    print(f"[INFO] Logging experiment in directory: {log_root_path}")
+
+    log_dir = agent_cfg["params"]["config"].get("full_experiment_name", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     agent_cfg["params"]["config"]["train_dir"] = log_root_path
     agent_cfg["params"]["config"]["full_experiment_name"] = log_dir
 
@@ -109,13 +129,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
+    # convert to single-agent instance if required by the RL algorithm
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
 
-    # ADD ACTION BUFFER WRAPPER HERE
-    if args_cli.action_repeat > 1:
-        env = ActionBufferWrapper(env, action_repeat=args_cli.action_repeat)
-        logger.info(f"[INFO] Action buffer enabled: {args_cli.action_repeat}x repetition")
+    # Apply action delay wrapper if action_delay > 1
+    if args_cli.action_delay > 1:
+        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay)
+        logger.info(f"[INFO] Action delay enabled: {args_cli.action_delay} steps delay")
 
     # wrap for video recording
     if args_cli.video:
@@ -126,42 +147,33 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             "disable_logger": True,
         }
         print("[INFO] Recording videos during training.")
+        print_dict(video_kwargs, nesting=4)
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
-    # wrap around environment for rl-games
-    rl_device = agent_cfg["params"]["config"]["device"]
-    clip_obs = agent_cfg["params"]["env"].get("clip_observations", math.inf)
-    clip_actions = agent_cfg["params"]["env"].get("clip_actions", math.inf)
-    obs_groups = agent_cfg["params"]["env"].get("obs_groups")
-    concate_obs_groups = agent_cfg["params"]["env"].get("concate_obs_groups", True)
+    start_time = time.time()
 
-    env = RlGamesVecEnvWrapper(env, rl_device, clip_obs, clip_actions, obs_groups, concate_obs_groups)
+    # wrap around environment for rsl-rl
+    env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg["params"]["env"].get("clip_actions", math.inf))
 
-    # register the environment to rl-games registry
-    vecenv.register(
-        "IsaacRlgWrapper", lambda config_name, num_actors, **kwargs: RlGamesGpuEnv(config_name, num_actors, **kwargs)
-    )
-    env_configurations.register("rlgpu", {"vecenv_type": "IsaacRlgWrapper", "env_creator": lambda **kwargs: env})
+    print(f"[INFO] Environment ready with action_delay={args_cli.action_delay}")
 
     # set number of actors into agent config
     agent_cfg["params"]["config"]["num_actors"] = env.unwrapped.num_envs
 
-    # create runner from rl-games
-    runner = Runner(IsaacAlgoObserver())
-    runner.load(agent_cfg)
-    runner.reset()
+    # create agent from config
+    from isaaclab_rl.rsl_rl import OnPolicyRunner
+
+    runner = OnPolicyRunner(env, agent_cfg, args_cli.device, experiment_name=config_name, run_name=log_dir)
 
     # train the agent
-    runner.run(
-        {
-            "train": True,
-            "play": False,
-            "checkpoint": agent_cfg["params"].get("load_checkpoint"),
-            "sigma": agent_cfg["params"].get("sigma"),
-        }
+    runner.learn(
+        total_time_steps=agent_cfg["params"]["config"]["max_epochs"],
+        init_at_random_ep_len=True,
     )
 
     env.close()
+
+    print(f"Training time: {round(time.time() - start_time, 2)} seconds")
 
 
 if __name__ == "__main__":
