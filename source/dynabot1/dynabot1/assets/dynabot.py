@@ -165,7 +165,7 @@ DYNABOT_1_WITH_DELAY_CFG = ArticulationCfg(
             damping=5.5,
             effort_limit=14.5,
             min_delay=0,    # in physics steps (0 = no delay)
-            max_delay=5,    # max delay (adjust for latency)
+            max_delay=4,    # max delay (adjust for latency)
         ),
         "shoulder_to_arm": DelayedPDActuatorCfg(
             joint_names_expr=[".*shoulder_to_arm"],
@@ -173,7 +173,7 @@ DYNABOT_1_WITH_DELAY_CFG = ArticulationCfg(
             damping=1.85,
             effort_limit=14.5,
             min_delay=0,
-            max_delay=5,
+            max_delay=4,
         ),
         "arm_to_hand": DelayedPDActuatorCfg(
             joint_names_expr=[".*arm_to_hand"],
@@ -181,7 +181,7 @@ DYNABOT_1_WITH_DELAY_CFG = ArticulationCfg(
             damping=3.5,
             effort_limit=14.5,
             min_delay=0,
-            max_delay=5,
+            max_delay=4,
         ),
     },
 )
