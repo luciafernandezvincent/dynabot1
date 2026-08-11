@@ -8,14 +8,15 @@ from dynabot1.tasks.manager_based.locomotion.velocity.velocity_env_cfg import Lo
 
 # The configs below are used to create the robot in the scene.
 # The servos used it an the 
-from dynabot1.assets.dynabot import DYNABOT_1_WITH_DELAY_CFG
+from dynabot1.assets.dynabot import DYNABOT_1_CFG, DYNABOT_1_WITH_DELAY_CFG
 
 @configclass
 class AnymalDRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
-        self.scene.robot = DYNABOT_1_WITH_DELAY_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.robot = DYNABOT_1_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        # Para usar delay, cambiar a: DYNABOT_1_WITH_DELAY_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/base_link"
         # scale down the terrains because the robot is small
         self.scene.terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.025, 0.1)
