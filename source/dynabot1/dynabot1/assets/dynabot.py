@@ -27,7 +27,7 @@ import os
 from isaaclab_assets.sensors.velodyne import VELODYNE_VLP_16_RAYCASTER_CFG
 
 import isaaclab.sim as sim_utils
-from isaaclab.actuators import ActuatorNetLSTMCfg, DCMotorCfg
+from isaaclab.actuators import ActuatorNetLSTMCfg, DCMotorCfg, DelayedPDActuatorCfg
 from isaaclab.assets.articulation import ArticulationCfg
 from isaaclab.sensors import RayCasterCfg
 from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
@@ -125,4 +125,63 @@ DYNABOT_1_CFG = ArticulationCfg(
 
     #actuators={"legs": ANYDRIVE_3_LSTM_ACTUATOR_CFG},
     #soft_joint_pos_limit_factor=0.95,
+)
+
+# Alternative: Use DelayedPDActuatorCfg for action delay simulation
+# Uncomment below and comment out the actuators above to enable delay
+# The delay will be applied at the actuator level (more realistic than ActionDelayWrapper)
+
+DYNABOT_1_WITH_DELAY_CFG = ArticulationCfg(
+    spawn=sim_utils.UsdFileCfg(
+        usd_path=USD_PATH,
+        activate_contact_sensors=True,
+        rigid_props=sim_utils.RigidBodyPropertiesCfg(
+            disable_gravity=False,
+            retain_accelerations=False,
+            linear_damping=0.0,
+            angular_damping=0.0,
+            max_linear_velocity=1000.0,
+            max_angular_velocity=1000.0,
+            max_depenetration_velocity=1.0,
+        ),
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+            enabled_self_collisions=False, solver_position_iteration_count=4, solver_velocity_iteration_count=0
+        ),
+    ),
+    init_state=ArticulationCfg.InitialStateCfg(
+        pos=(0.0, 0.0, 0.3),
+        joint_pos={
+            ".*_shoulder": 0.0,
+            ".*shoulder_to_arm": - 0.79,
+            ".*arm_to_hand": 1.5,
+        },
+        joint_vel={".*": 0.0},
+    ),
+    soft_joint_pos_limit_factor=0.9,
+    actuators={
+        "shoulder": DelayedPDActuatorCfg(
+            joint_names_expr=[".*_shoulder"],
+            stiffness=90.0,
+            damping=5.5,
+            effort_limit=14.5,
+            min_delay=0,    # in physics steps (0 = no delay)
+            max_delay=4,    # max delay (adjust for latency)
+        ),
+        "shoulder_to_arm": DelayedPDActuatorCfg(
+            joint_names_expr=[".*shoulder_to_arm"],
+            stiffness=28.0,
+            damping=1.85,
+            effort_limit=14.5,
+            min_delay=0,
+            max_delay=4,
+        ),
+        "arm_to_hand": DelayedPDActuatorCfg(
+            joint_names_expr=[".*arm_to_hand"],
+            stiffness=100.0,
+            damping=3.5,
+            effort_limit=14.5,
+            min_delay=0,
+            max_delay=4,
+        ),
+    },
 )

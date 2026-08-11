@@ -5,7 +5,6 @@ from isaaclab.utils import configclass
 import dynabot1.tasks.manager_based.locomotion.velocity.mdp as mdp
 
 from .rough_env_cfg import AnymalDRoughEnvCfg
-from dynabot1.assets.dynabot import DYNABOT_1_CFG
 
 @configclass
 class AnymalDFlatEnvCfg(AnymalDRoughEnvCfg):
