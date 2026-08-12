@@ -65,7 +65,6 @@ class ActionDelayWrapper:
         """
         # Queue the new action
         self.action_queue.append(actions)
-
         # Get action to execute (from front of queue or default)
         if len(self.action_queue) == self.delay_steps:
             # Queue is full, execute oldest action
