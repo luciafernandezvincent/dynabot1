@@ -20,7 +20,7 @@ class ActionDelayWrapper:
         # etc.
     """
 
-    def __init__(self, env, delay_steps: int = 1, default_action="zeros"):
+    def __init__(self, env, delay_steps: int = 1, default_action="zeros", log_interval: int = 100):
         """
         Initialize action delay wrapper.
 
@@ -30,12 +30,15 @@ class ActionDelayWrapper:
             default_action: What to send before first actions arrive
                 - "zeros": Send zero action
                 - "hold": Hold last action (requires first action to initialize)
+            log_interval: Print delay info every N steps (0 = disabled)
         """
         self.env = env
         self.delay_steps = max(1, delay_steps)
         self.default_action = default_action
         self.action_queue = deque(maxlen=delay_steps)
         self.last_action = None
+        self.log_interval = log_interval
+        self.step_count = 0
 
         # Expose common environment attributes
         if hasattr(env, 'observation_space'):
@@ -89,7 +92,28 @@ class ActionDelayWrapper:
         # Step environment with delayed action
         obs, reward, done, truncated, info = self.env.step(action_to_execute)
 
-        return obs, reward, done,truncated, info
+        # Store delayed action info in info dict for logging
+        if "delayed_action" not in info:
+            info["delayed_action"] = action_to_execute
+        if "input_action" not in info:
+            info["input_action"] = actions
+        info["queue_size"] = len(self.action_queue)
+
+        # Log delay information periodically
+        self.step_count += 1
+        if self.log_interval > 0 and self.step_count % self.log_interval == 0:
+            print(f"\n[ActionDelayWrapper] Step {self.step_count}:")
+            print(f"  Delay: {self.delay_steps} steps")
+            print(f"  Queue size: {len(self.action_queue)}/{self.delay_steps}")
+            if action_to_execute is not None and isinstance(action_to_execute, torch.Tensor):
+                print(f"  Input actions shape: {actions.shape}")
+                print(f"  Delayed actions shape: {action_to_execute.shape}")
+                print(f"  Input actions:\n{actions}")
+                print(f"  Delayed actions:\n{action_to_execute}")
+            elif action_to_execute is not None:
+                print(f"  Action type: {type(action_to_execute)}")
+
+        return obs, reward, done, truncated, info
 
     def _create_zero_action(self, action_template):
         """Create zero action with same shape as template."""
