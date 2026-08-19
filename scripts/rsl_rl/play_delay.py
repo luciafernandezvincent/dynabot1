@@ -147,7 +147,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # Apply action delay wrapper if action_delay > 1
     if args_cli.action_delay > 1:
-        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay, log_interval=50)
+        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay)
         print(f"[INFO] Action delay enabled: {args_cli.action_delay} steps delay")
 
     # wrap for video recording
