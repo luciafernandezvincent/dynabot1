@@ -35,6 +35,13 @@ parser.add_argument(
     "--ray-proc-id", "-rid", type=int, default=None, help="Automatically configured by Ray integration, otherwise None."
 )
 parser.add_argument("--action-delay", type=int, default=1, help="Number of steps to delay actions (1 = no delay)")
+parser.add_argument("--experiment_config", type=str, default=None,
+    help=(
+        "Path to a YAML file with 'env:' and/or 'agent:' sections to override env/agent config fields "
+        "(rewards, PPO hyperparameters, network hidden dims, etc.). Set a field to 'null'/'~' to disable it "
+        "(e.g. a reward term or event term)."
+    ),
+)
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -79,6 +86,7 @@ if version.parse(installed_version) < version.parse(RSL_RL_VERSION):
 import logging
 import os
 import time
+import yaml
 from datetime import datetime
 
 import gymnasium as gym
@@ -113,6 +121,53 @@ torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
 
 
+def apply_overrides(cfg_obj, overrides: dict, path: str = "") -> None:
+    """Recursively apply a nested dict of overrides onto a config object's attributes.
+
+    - A leaf value (not a dict) is set directly with setattr.
+    - A dict value whose current attribute is a plain dict (e.g. a reward term's ``params``) is merged
+      key-by-key, recursing into any nested config object found inside that dict (e.g. ``params.sensor_cfg``)
+      instead of overwriting it.
+    - A dict value whose current attribute is a config object (has ``__dict__``) recurses into it.
+    - ``None`` disables the attribute (e.g. an optional reward/event term), matching the pattern used
+      throughout the env cfgs (``self.rewards.undesired_contacts = None``).
+    """
+    for key, value in overrides.items():
+        full_path = f"{path}.{key}" if path else key
+        if not hasattr(cfg_obj, key):
+            logger.warning(f"[WARNING] Config field '{full_path}' not found, skipping.")
+            continue
+        current = getattr(cfg_obj, key)
+
+        if value is None:
+            setattr(cfg_obj, key, None)
+            logger.info(f"[INFO] Set '{full_path}' = None")
+        elif isinstance(value, dict) and isinstance(current, dict):
+            for sub_key, sub_value in value.items():
+                nested_cfg = current.get(sub_key)
+                if isinstance(sub_value, dict) and hasattr(nested_cfg, "__dict__"):
+                    apply_overrides(nested_cfg, sub_value, f"{full_path}.{sub_key}")
+                else:
+                    current[sub_key] = sub_value
+                    logger.info(f"[INFO] Set '{full_path}.{sub_key}' = {sub_value}")
+        elif isinstance(value, dict) and hasattr(current, "__dict__"):
+            apply_overrides(current, value, full_path)
+        else:
+            setattr(cfg_obj, key, value)
+            logger.info(f"[INFO] Set '{full_path}' = {value}")
+
+
+def apply_experiment_config(env_cfg, agent_cfg, config_path: str) -> None:
+    """Load a YAML file with 'env:' and/or 'agent:' sections and apply them as config overrides."""
+    with open(config_path) as f:
+        experiment_cfg = yaml.safe_load(f) or {}
+
+    if "env" in experiment_cfg:
+        apply_overrides(env_cfg, experiment_cfg["env"], path="env")
+    if "agent" in experiment_cfg:
+        apply_overrides(agent_cfg, experiment_cfg["agent"], path="agent")
+
+
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlBaseRunnerCfg):
     """Train with RSL-RL agent."""
@@ -125,6 +180,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # handle deprecated configurations
     agent_cfg = handle_deprecated_rsl_rl_cfg(agent_cfg, installed_version)
+
+    # apply env/agent overrides from a YAML experiment config, if requested
+    if args_cli.experiment_config is not None:
+        apply_experiment_config(env_cfg, agent_cfg, args_cli.experiment_config)
 
     # set the environment seed
     # note: certain randomizations occur in the environment initialization so we set the seed here

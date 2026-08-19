@@ -1,0 +1,29 @@
+# Example experiment config for train_delay.py --experiment_config
+#
+# Two optional top-level sections, mirroring the "env" / "agent" objects Hydra already exposes:
+#   env:   fields of the ManagerBasedRLEnvCfg (rewards, events, commands, episode_length_s, ...)
+#   agent: fields of the RSL-RL runner cfg (algorithm, policy network, num_steps_per_env, ...)
+#
+# Rules:
+# - A leaf value overrides that field directly.
+# - A mapping recurses into the matching nested config object (e.g. rewards.feet_air_time.weight).
+# - null disables the field entirely -- only valid for optional terms (reward/event terms set to None).
+
+env:
+  rewards:
+    feet_air_time:
+      weight: 0.0
+    undesired_contacts: null
+    dof_torques_l2:
+      weight: -0.0002
+  episode_length_s: 20.0
+
+agent:
+  algorithm:
+    learning_rate: 5.0e-4
+    clip_param: 0.3
+  policy:
+    actor_hidden_dims: [256, 128, 64]
+    critic_hidden_dims: [256, 128, 64]
+    init_noise_std: 0.8
+  num_steps_per_env: 24
