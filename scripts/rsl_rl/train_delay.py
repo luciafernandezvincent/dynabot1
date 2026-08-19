@@ -35,6 +35,7 @@ parser.add_argument(
     "--ray-proc-id", "-rid", type=int, default=None, help="Automatically configured by Ray integration, otherwise None."
 )
 parser.add_argument("--action-delay", type=int, default=1, help="Number of steps to delay actions (1 = no delay)")
+parser.add_argument("--name", type=str, default="", help="Name for the experiment folder")
 parser.add_argument("--experiment_config", type=str, default=None,
     help=(
         "Path to a YAML file with 'env:' and/or 'agent:' sections to override env/agent config fields "
@@ -210,14 +211,21 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)
     print(f"[INFO] Logging experiment in directory: {log_root_path}")
-    # specify directory for logging runs: {time-stamp}_{run_name}
-    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # specify directory for logging runs: use --name if provided, otherwise use timestamp
+    if args_cli.name:
+        log_dir = args_cli.name
+    else:
+        log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     # The Ray Tune workflow extracts experiment name using the logging line below, hence, do not
     # change it (see PR #2346, comment-2819298849)
     print(f"Exact experiment name requested from command line: {log_dir}")
-    if agent_cfg.run_name:
+    if agent_cfg.run_name and not args_cli.name:
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
+
+    print("\n" + "="*80)
+    print(f"SAVING MODEL TO: {log_dir}")
+    print("="*80 + "\n")
 
     # set the IO descriptors export flag if requested
     if isinstance(env_cfg, ManagerBasedRLEnvCfg):

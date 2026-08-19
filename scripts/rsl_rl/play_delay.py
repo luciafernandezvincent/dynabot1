@@ -131,6 +131,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     log_dir = os.path.dirname(resume_path)
 
+    print("\n" + "="*80)
+    print(f"LOADING MODEL FROM: {log_dir}")
+    print("="*80 + "\n")
+
     # set the log directory for the environment (works for all environment types)
     env_cfg.log_dir = log_dir
 
