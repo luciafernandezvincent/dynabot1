@@ -131,13 +131,13 @@ class ObservationsCfg:
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Gnoise(mean=0.0, std=0.02))
         base_ang_vel = ObsTerm(
             func=mdp.base_ang_vel,
-            noise=Gnoise(mean=torch.tensor([0.0104, 0.039, 0.0164]), std=torch.tensor([0.0078, 0.0032, 0.0015])),
+            noise=Gnoise(mean=0.039, std=0.0078),
         )
         #base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
         
         projected_gravity =  ObsTerm(
             func=mdp.base_ang_vel,
-            noise=Gnoise(mean=torch.tensor([0.0433, 0.2003, 0.00005]), std=torch.tensor([0.0023, 0.0019, 0.00005])),
+            noise=Gnoise(mean=0.2003, std=0.0023),
         )
         #projected_gravity = ObsTerm(func=mdp.projected_gravity,noise=Gnoise(mean=0.0, std=0.048))
         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
