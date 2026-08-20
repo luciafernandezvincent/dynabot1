@@ -91,11 +91,29 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
     state["shoulder_falls"] += int(term_manager.get_term("shoulder_contact").sum().item())
     state["episodes"] += int(dones.sum().item())
 
+    # foot impact force: force magnitude on each foot at the instant it touches down
+    contact_sensor = env.unwrapped.scene.sensors["contact_forces"]
+    if state["foot_ids"] is None:
+        state["foot_ids"], _ = contact_sensor.find_bodies(".*hand_link")
+    first_contact = contact_sensor.compute_first_contact(env.unwrapped.step_dt)[:, state["foot_ids"]]
+    foot_forces = torch.norm(contact_sensor.data.net_forces_w[:, state["foot_ids"], :], dim=-1)
+    impact_forces = foot_forces[first_contact]
+    if impact_forces.numel() > 0:
+        state["impact_force_sum"] += impact_forces.sum().item()
+        state["impact_force_sq_sum"] += (impact_forces**2).sum().item()
+        state["impact_force_count"] += impact_forces.numel()
+        state["impact_force_max"] = max(state["impact_force_max"], impact_forces.max().item())
+
 
 def compute_results(env, state: dict) -> dict:
     """Called once after the simulation loop ends. Fill this in to aggregate the final metrics."""
     total_falls = state["base_falls"] + state["shoulder_falls"]
     episodes = state["episodes"]
+
+    count = state["impact_force_count"]
+    impact_mean = state["impact_force_sum"] / count if count > 0 else 0.0
+    impact_var = state["impact_force_sq_sum"] / count - impact_mean**2 if count > 0 else 0.0
+
     return {
         "num_envs": env.unwrapped.num_envs,
         "num_steps": args_cli.num_steps,
@@ -104,6 +122,10 @@ def compute_results(env, state: dict) -> dict:
         "shoulder_falls": state["shoulder_falls"],
         "total_falls": total_falls,
         "fall_rate_per_episode": total_falls / episodes if episodes > 0 else 0.0,
+        "num_footsteps": count,
+        "impact_force_mean": impact_mean,
+        "impact_force_std": impact_var**0.5 if impact_var > 0 else 0.0,
+        "impact_force_max": state["impact_force_max"],
     }
 
 
@@ -162,7 +184,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # apply action delay wrapper if action_delay > 1
     if args_cli.action_delay > 1:
-        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay, log_interval=50)
+        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay)
         print(f"[INFO] Action delay enabled: {args_cli.action_delay} steps delay")
 
     # wrap around environment for rsl-rl
@@ -184,7 +206,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # reset environment
     obs = env.get_observations()
-    state = {"base_falls": 0, "shoulder_falls": 0, "episodes": 0}
+    state = {
+        "base_falls": 0,
+        "shoulder_falls": 0,
+        "episodes": 0,
+        "foot_ids": None,
+        "impact_force_sum": 0.0,
+        "impact_force_sq_sum": 0.0,
+        "impact_force_count": 0,
+        "impact_force_max": 0.0,
+    }
     # simulate environment for a fixed number of steps
     for step in range(args_cli.num_steps):
         with torch.inference_mode():
