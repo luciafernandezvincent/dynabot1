@@ -60,8 +60,10 @@ import json
 import os
 
 import gymnasium as gym
+import numpy as np
 import torch
 from rsl_rl.runners import DistillationRunner, OnPolicyRunner
+from scipy import signal
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -104,6 +106,152 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
         state["impact_force_count"] += impact_forces.numel()
         state["impact_force_max"] = max(state["impact_force_max"], impact_forces.max().item())
 
+    # Record joint positions for smoothness analysis
+    articulation = env.unwrapped.scene.articulations["robot"]
+    joint_pos = articulation.data.joint_pos.detach().cpu().numpy()  # Shape: (num_envs, num_joints)
+    if state["joint_positions"] is None:
+        state["joint_positions"] = []
+    state["joint_positions"].append(joint_pos)
+
+    # Record base velocity and orientation for path tracking and stability
+    root_state = articulation.data.root_state_w  # (num_envs, 13)
+    base_lin_vel = root_state[:, 7:10].detach().cpu().numpy()  # Linear velocity
+    base_ang_vel = root_state[:, 10:13].detach().cpu().numpy()  # Angular velocity
+    base_pos = root_state[:, :3].detach().cpu().numpy()  # Position
+    base_quat = root_state[:, 3:7].detach().cpu().numpy()  # Quaternion
+
+    if state["base_positions"] is None:
+        state["base_positions"] = []
+        state["base_lin_vels"] = []
+        state["base_quats"] = []
+
+    state["base_positions"].append(base_pos)
+    state["base_lin_vels"].append(base_lin_vel)
+    state["base_quats"].append(base_quat)
+
+
+def compute_movement_smoothness(joint_positions):
+    """Calculate smoothness as mean of second derivatives (acceleration magnitude)."""
+    if len(joint_positions) < 3:
+        return 0.0
+
+    positions = np.array(joint_positions)  # Shape: (num_steps, num_envs, num_joints)
+    num_steps, num_envs, num_joints = positions.shape
+
+    # Calculate velocity (first derivative)
+    velocity = np.diff(positions, axis=0)  # Shape: (num_steps-1, num_envs, num_joints)
+
+    # Calculate acceleration (second derivative)
+    acceleration = np.diff(velocity, axis=0)  # Shape: (num_steps-2, num_envs, num_joints)
+
+    # Mean magnitude of acceleration across all joints and envs
+    acc_magnitude = np.mean(np.abs(acceleration))
+
+    # Smoothness: inverse of acceleration (lower acceleration = smoother)
+    smoothness = 1.0 / (1.0 + acc_magnitude)
+
+    return float(smoothness)
+
+
+def compute_movement_frequency(joint_positions, dt=0.02):
+    """Estimate dominant frequency using FFT."""
+    if len(joint_positions) < 10:
+        return 0.0
+
+    positions = np.array(joint_positions)  # Shape: (num_steps, num_envs, num_joints)
+
+    # Use only first env and first joint for frequency analysis
+    signal_data = positions[:, 0, 0]
+
+    # Compute FFT
+    fft = np.fft.fft(signal_data)
+    freqs = np.fft.fftfreq(len(signal_data), d=dt)
+
+    # Get positive frequencies only
+    positive_freqs = freqs[:len(freqs)//2]
+    power = np.abs(fft[:len(fft)//2])
+
+    # Find dominant frequency (excluding DC component)
+    dominant_idx = np.argmax(power[1:]) + 1
+    dominant_freq = positive_freqs[dominant_idx]
+
+    return float(np.abs(dominant_freq))
+
+
+def quat_to_euler(quat):
+    """Convert quaternion (x,y,z,w) to euler angles (roll, pitch, yaw) in radians."""
+    x, y, z, w = quat[..., 0], quat[..., 1], quat[..., 2], quat[..., 3]
+
+    roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x**2 + y**2))
+    pitch = np.arcsin(2 * (w * y - z * x))
+    yaw = np.arctan2(2 * (w * z + x * y), 1 - 2 * (y**2 + z**2))
+
+    return np.stack([roll, pitch, yaw], axis=-1)
+
+
+def compute_orientation_stability(base_quats, dt=0.02):
+    """Measure orientation stability - how constant is roll/pitch (should be ~0)."""
+    if len(base_quats) < 2:
+        return 0.0
+
+    quats = np.array(base_quats)  # Shape: (num_steps, num_envs, 4)
+
+    # Convert to euler angles
+    euler = quat_to_euler(quats)  # Shape: (num_steps, num_envs, 3)
+
+    # Extract roll and pitch (yaw doesn't matter for stability)
+    roll_pitch = euler[:, 0, :2]  # Use first env, roll and pitch only
+
+    # Stability = inverse of variance (lower variance = more stable)
+    roll_pitch_variance = np.var(roll_pitch, axis=0).mean()
+
+    # Return value from 0 to 1 (1 = perfectly stable)
+    stability = 1.0 / (1.0 + roll_pitch_variance * 10)
+
+    return float(stability)
+
+
+def compute_orientation_smoothness(base_quats, dt=0.02):
+    """Measure how smoothly orientation changes - no abrupt rotations."""
+    if len(base_quats) < 3:
+        return 0.0
+
+    quats = np.array(base_quats)  # Shape: (num_steps, num_envs, 4)
+    euler = quat_to_euler(quats)  # Shape: (num_steps, num_envs, 3)
+
+    # Calculate angular velocity (derivative of euler angles)
+    angular_vel = np.diff(euler, axis=0) / dt  # Shape: (num_steps-1, num_envs, 3)
+
+    # Calculate angular acceleration (second derivative)
+    angular_acc = np.diff(angular_vel, axis=0) / dt  # Shape: (num_steps-2, num_envs, 3)
+
+    # Mean magnitude of angular acceleration
+    acc_magnitude = np.mean(np.abs(angular_acc))
+
+    # Smoothness: inverse of angular acceleration
+    smoothness = 1.0 / (1.0 + acc_magnitude)
+
+    return float(smoothness)
+
+
+def compute_velocity_tracking_accuracy(base_lin_vels, cmd_vel_x_range=1.0, cmd_vel_y_range=1.0):
+    """Measure how well actual velocity matches commanded velocity range."""
+    if len(base_lin_vels) < 2:
+        return 0.0
+
+    vels = np.array(base_lin_vels)  # Shape: (num_steps, num_envs, 3)
+    vel_magnitude = np.linalg.norm(vels[:, 0, :2], axis=1)  # XY velocity only
+
+    # Expected velocity range (from commands)
+    expected_max = np.sqrt(cmd_vel_x_range**2 + cmd_vel_y_range**2)
+
+    # Accuracy: how close is actual velocity to expected range
+    # 0 if never moving, 1 if consistent with commands
+    mean_vel = np.mean(vel_magnitude)
+    tracking_accuracy = min(mean_vel / expected_max, 1.0)
+
+    return float(tracking_accuracy)
+
 
 def compute_results(env, state: dict) -> dict:
     """Called once after the simulation loop ends. Fill this in to aggregate the final metrics."""
@@ -113,6 +261,17 @@ def compute_results(env, state: dict) -> dict:
     count = state["impact_force_count"]
     impact_mean = state["impact_force_sum"] / count if count > 0 else 0.0
     impact_var = state["impact_force_sq_sum"] / count - impact_mean**2 if count > 0 else 0.0
+
+    # Calculate movement metrics
+    smoothness = compute_movement_smoothness(state["joint_positions"]) if state["joint_positions"] else 0.0
+    frequency = compute_movement_frequency(state["joint_positions"]) if state["joint_positions"] else 0.0
+
+    # Calculate orientation metrics
+    orientation_stability = compute_orientation_stability(state["base_quats"]) if state["base_quats"] else 0.0
+    orientation_smoothness = compute_orientation_smoothness(state["base_quats"]) if state["base_quats"] else 0.0
+
+    # Calculate velocity tracking
+    velocity_tracking = compute_velocity_tracking_accuracy(state["base_lin_vels"]) if state["base_lin_vels"] else 0.0
 
     return {
         "num_envs": env.unwrapped.num_envs,
@@ -126,6 +285,11 @@ def compute_results(env, state: dict) -> dict:
         "impact_force_mean": impact_mean,
         "impact_force_std": impact_var**0.5 if impact_var > 0 else 0.0,
         "impact_force_max": state["impact_force_max"],
+        "movement_smoothness": smoothness,
+        "movement_frequency_hz": frequency,
+        "orientation_stability_0to1": orientation_stability,
+        "orientation_smoothness_0to1": orientation_smoothness,
+        "velocity_tracking_accuracy_0to1": velocity_tracking,
     }
 
 
@@ -215,6 +379,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "impact_force_sq_sum": 0.0,
         "impact_force_count": 0,
         "impact_force_max": 0.0,
+        "joint_positions": None,
+        "base_positions": None,
+        "base_lin_vels": None,
+        "base_quats": None,
     }
     # simulate environment for a fixed number of steps
     for step in range(args_cli.num_steps):
