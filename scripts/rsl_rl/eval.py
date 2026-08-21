@@ -121,21 +121,35 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
         state["joint_positions"] = []
     state["joint_positions"].append(joint_pos)
 
-    # Record base velocity and orientation for path tracking and stability
+    # Record base position and orientation for path tracking and stability
     root_state = articulation.data.root_state_w  # (num_envs, 13)
-    base_lin_vel = root_state[:, 7:10].detach().cpu().numpy()  # Linear velocity
-    base_ang_vel = root_state[:, 10:13].detach().cpu().numpy()  # Angular velocity
     base_pos = root_state[:, :3].detach().cpu().numpy()  # Position
     base_quat = root_state[:, 3:7].detach().cpu().numpy()  # Quaternion
 
     if state["base_positions"] is None:
         state["base_positions"] = []
-        state["base_lin_vels"] = []
         state["base_quats"] = []
+        state["done_history"] = []
 
     state["base_positions"].append(base_pos)
-    state["base_lin_vels"].append(base_lin_vel)
     state["base_quats"].append(base_quat)
+    # tracks, per step/env, whether this pose is a post-reset teleport rather than a continuous rotation
+    state["done_history"].append(dones.detach().cpu().numpy().astype(bool))
+
+    # Record commanded vs. actual body-frame velocity for velocity tracking accuracy
+    if state["has_velocity_command"] is None:
+        state["has_velocity_command"] = "base_velocity" in env.unwrapped.command_manager.active_terms
+    if state["has_velocity_command"]:
+        cmd_vel = env.unwrapped.command_manager.get_command("base_velocity").detach().cpu().numpy()  # (num_envs, 3): vx, vy, wz
+        actual_lin_vel_b = articulation.data.root_lin_vel_b[:, :2].detach().cpu().numpy()
+        actual_ang_vel_b = articulation.data.root_ang_vel_b[:, 2:3].detach().cpu().numpy()
+        actual_vel = np.concatenate([actual_lin_vel_b, actual_ang_vel_b], axis=-1)  # (num_envs, 3): vx, vy, wz
+
+        if state["cmd_vels"] is None:
+            state["cmd_vels"] = []
+            state["actual_vels"] = []
+        state["cmd_vels"].append(cmd_vel)
+        state["actual_vels"].append(actual_vel)
 
 
 def compute_movement_smoothness(joint_positions):
@@ -177,8 +191,8 @@ def compute_gait_metrics(foot_touchdowns, foot_contact_steps, foot_names, num_en
 
 
 def quat_to_euler(quat):
-    """Convert quaternion (x,y,z,w) to euler angles (roll, pitch, yaw) in radians."""
-    x, y, z, w = quat[..., 0], quat[..., 1], quat[..., 2], quat[..., 3]
+    """Convert quaternion (w,x,y,z) to euler angles (roll, pitch, yaw) in radians."""
+    w, x, y, z = quat[..., 0], quat[..., 1], quat[..., 2], quat[..., 3]
 
     roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x**2 + y**2))
     pitch = np.arcsin(2 * (w * y - z * x))
@@ -198,9 +212,9 @@ def compute_orientation_stability(base_quats, dt=0.02):
     euler = quat_to_euler(quats)  # Shape: (num_steps, num_envs, 3)
 
     # Extract roll and pitch (yaw doesn't matter for stability)
-    roll_pitch = euler[:, 0, :2]  # Use first env, roll and pitch only
+    roll_pitch = euler[:, :, :2]  # Shape: (num_steps, num_envs, 2)
 
-    # Stability = inverse of variance (lower variance = more stable)
+    # Variance over time per env/axis, then averaged across all envs and axes
     roll_pitch_variance = np.var(roll_pitch, axis=0).mean()
 
     # Return value from 0 to 1 (1 = perfectly stable)
@@ -209,22 +223,32 @@ def compute_orientation_stability(base_quats, dt=0.02):
     return float(stability)
 
 
-def compute_orientation_smoothness(base_quats, dt=0.02):
+def compute_orientation_smoothness(base_quats, done_history, dt=0.02):
     """Measure how smoothly orientation changes - no abrupt rotations."""
     if len(base_quats) < 3:
         return 0.0
 
     quats = np.array(base_quats)  # Shape: (num_steps, num_envs, 4)
     euler = quat_to_euler(quats)  # Shape: (num_steps, num_envs, 3)
+    euler = np.unwrap(euler, axis=0)  # remove artificial +-pi wraparound jumps before differentiating
 
     # Calculate angular velocity (derivative of euler angles)
     angular_vel = np.diff(euler, axis=0) / dt  # Shape: (num_steps-1, num_envs, 3)
 
+    # A step where an env resets teleports its pose to the spawn state, which is not a real rotation.
+    # Mark velocity/acceleration samples that span such a reset as invalid so they don't skew the score.
+    dones = np.array(done_history)  # Shape: (num_steps, num_envs)
+    valid_vel = ~dones[1:]  # Shape: (num_steps-1, num_envs), aligned with angular_vel
+
     # Calculate angular acceleration (second derivative)
     angular_acc = np.diff(angular_vel, axis=0) / dt  # Shape: (num_steps-2, num_envs, 3)
+    valid_acc = valid_vel[:-1] & valid_vel[1:]  # Shape: (num_steps-2, num_envs)
 
-    # Mean magnitude of angular acceleration
-    acc_magnitude = np.mean(np.abs(angular_acc))
+    if not valid_acc.any():
+        return 0.0
+
+    # Mean magnitude of angular acceleration, excluding samples that span a reset
+    acc_magnitude = np.mean(np.abs(angular_acc[valid_acc]))
 
     # Smoothness: inverse of angular acceleration
     smoothness = 1.0 / (1.0 + acc_magnitude)
@@ -232,23 +256,25 @@ def compute_orientation_smoothness(base_quats, dt=0.02):
     return float(smoothness)
 
 
-def compute_velocity_tracking_accuracy(base_lin_vels, cmd_vel_x_range=1.0, cmd_vel_y_range=1.0):
-    """Measure how well actual velocity matches commanded velocity range."""
-    if len(base_lin_vels) < 2:
+def compute_velocity_tracking_accuracy(cmd_vels, actual_vels, std: float = 0.5):
+    """Measure how well body-frame velocity tracks the [vx, vy, wz] command, step-by-step and per env.
+
+    Mirrors the exponential-kernel error used by the training rewards (track_lin_vel_xy_exp /
+    track_ang_vel_z_exp), so the score is directly comparable to what the policy was optimized for.
+    """
+    if len(cmd_vels) < 1:
         return 0.0
 
-    vels = np.array(base_lin_vels)  # Shape: (num_steps, num_envs, 3)
-    vel_magnitude = np.linalg.norm(vels[:, 0, :2], axis=1)  # XY velocity only
+    cmd = np.array(cmd_vels)  # Shape: (num_steps, num_envs, 3): vx, vy, wz
+    actual = np.array(actual_vels)  # Shape: (num_steps, num_envs, 3): vx, vy, wz
 
-    # Expected velocity range (from commands)
-    expected_max = np.sqrt(cmd_vel_x_range**2 + cmd_vel_y_range**2)
+    lin_vel_error = np.sum((cmd[..., :2] - actual[..., :2]) ** 2, axis=-1)  # Shape: (num_steps, num_envs)
+    ang_vel_error = (cmd[..., 2] - actual[..., 2]) ** 2  # Shape: (num_steps, num_envs)
 
-    # Accuracy: how close is actual velocity to expected range
-    # 0 if never moving, 1 if consistent with commands
-    mean_vel = np.mean(vel_magnitude)
-    tracking_accuracy = min(mean_vel / expected_max, 1.0)
+    lin_tracking = np.mean(np.exp(-lin_vel_error / std**2))
+    ang_tracking = np.mean(np.exp(-ang_vel_error / std**2))
 
-    return float(tracking_accuracy)
+    return float((lin_tracking + ang_tracking) / 2.0)
 
 
 def compute_results(env, state: dict) -> dict:
@@ -280,10 +306,16 @@ def compute_results(env, state: dict) -> dict:
 
     # Calculate orientation metrics
     orientation_stability = compute_orientation_stability(state["base_quats"]) if state["base_quats"] else 0.0
-    orientation_smoothness = compute_orientation_smoothness(state["base_quats"]) if state["base_quats"] else 0.0
+    orientation_smoothness = (
+        compute_orientation_smoothness(state["base_quats"], state["done_history"], dt=env.unwrapped.step_dt)
+        if state["base_quats"]
+        else 0.0
+    )
 
     # Calculate velocity tracking
-    velocity_tracking = compute_velocity_tracking_accuracy(state["base_lin_vels"]) if state["base_lin_vels"] else 0.0
+    velocity_tracking = (
+        compute_velocity_tracking_accuracy(state["cmd_vels"], state["actual_vels"]) if state["cmd_vels"] else 0.0
+    )
 
     return {
         "num_envs": env.unwrapped.num_envs,
@@ -399,8 +431,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "impact_force_max": 0.0,
         "joint_positions": None,
         "base_positions": None,
-        "base_lin_vels": None,
         "base_quats": None,
+        "done_history": None,
+        "has_velocity_command": None,
+        "cmd_vels": None,
+        "actual_vels": None,
     }
     # simulate environment for a fixed number of steps
     for step in range(args_cli.num_steps):
