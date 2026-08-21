@@ -37,12 +37,12 @@ PYTHON = "/home/linar/miniconda3/envs/env_isaaclab/bin/python"
 # (la baseline sigue el comando de velocidad peor que quedarse quieta).
 QUEUE = [
     ("exp_001_clearance_on.yaml", "exp_001_clearance_on", "activar foot_clearance w=0.5 target 5cm"),
-    ("exp_002_clearance_strong.yaml", "exp_002_clearance_strong", "foot_clearance w=1.5 target 5cm"),
-    ("exp_003_clearance_low_target.yaml", "exp_003_clearance_low_target", "foot_clearance w=1.0 target 3cm"),
-    ("exp_004_clearance_plus_airtime.yaml", "exp_004_clearance_plus_airtime", "clearance w=1.0 + feet_air_time 1.0"),
-    ("exp_005_clearance_plus_contacts.yaml", "exp_005_clearance_plus_contacts", "undesired_contacts 3x, contener caidas de hombro"),
-    ("exp_006_entropy_down.yaml", "exp_006_entropy_down", "menos exploracion, explotar la marcha lograda"),
-    ("exp_007_lr_down.yaml", "exp_007_lr_down", "learning_rate mas chico, 5e-4, refinar sin saltos"),
+    ("exp_002_airtime_threshold_fix.yaml", "exp_002_airtime_threshold_fix", "CAUSA RAIZ: threshold 0.5s->0.12s, hoy el termino penaliza pisar"),
+    ("exp_003_airtime_fix_plus_clearance.yaml", "exp_003_airtime_fix_plus_clearance", "umbral corregido + clearance activado"),
+    ("exp_004_clearance_strong.yaml", "exp_004_clearance_strong", "foot_clearance w=1.5 target 5cm"),
+    ("exp_005_clearance_low_target.yaml", "exp_005_clearance_low_target", "foot_clearance w=1.0 target 3cm"),
+    ("exp_006_clearance_plus_airtime.yaml", "exp_006_clearance_plus_airtime", "clearance w=1.0 + feet_air_time w=1.0"),
+    ("exp_007_clearance_plus_contacts.yaml", "exp_007_clearance_plus_contacts", "undesired_contacts 3x, contener caidas de hombro"),
     ("exp_008_bigger_net.yaml", "exp_008_bigger_net", "red actor/critic mas grande [512,256,128]"),
 ]
 

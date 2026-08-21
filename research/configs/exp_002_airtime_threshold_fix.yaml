@@ -1,0 +1,17 @@
+# CAUSA RAIZ SOSPECHADA del arrastre de patas (medido 21/08).
+#
+# feet_air_time calcula (last_air_time - threshold) * first_contact con peso POSITIVO (+0.5).
+# Con threshold = 0.5 s y una fase de vuelo real de ~172 ms (zancada 3.07 Hz, duty 0.47), el
+# parentesis es SIEMPRE negativo: el termino cobra ~-0.05 por episodio en vez de premiar. Esta
+# penalizando cada pisada, y la respuesta optima de la politica es dar los pasos mas cortos y
+# rasantes posible. Verificado en los logs de entrenamiento de baseline_ar y exp_001:
+#   Episode_Reward/feet_air_time: -0.0566  (baseline_ar)
+#
+# Hipotesis: bajar el umbral a 0.12 s (por debajo del vuelo real de ~172 ms) invierte el signo
+# del termino y recien ahi premia de verdad el tiempo en el aire. Se prueba SOLO este cambio,
+# sin foot_clearance, para aislar cuanto del problema se explica por el umbral mal puesto.
+env:
+  rewards:
+    feet_air_time:
+      params:
+        threshold: 0.12

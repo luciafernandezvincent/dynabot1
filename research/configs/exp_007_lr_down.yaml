@@ -1,6 +1,0 @@
-# Hipotesis: con una politica que ya converge bien, un learning_rate mas chico en la etapa final
-# podria refinar sin los saltos que produce el schedule adaptativo, reduciendo varianza entre
-# seeds y quizas la tasa de caidas.
-agent:
-  algorithm:
-    learning_rate: 5.0e-4

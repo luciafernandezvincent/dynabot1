@@ -210,20 +210,36 @@ Cambios hechos en consecuencia:
   baseline, 22.9 mm). Sin esto, el loop descartaría los experimentos que arreglan el problema,
   porque cualquier ganancia de despeje con una pérdida mínima en otro término daría "NO MEJORA".
 
+**Causa raíz sospechada (medida el 21/08)**: `feet_air_time` calcula
+`(last_air_time - threshold) * first_contact` con peso **positivo** (+0.5) y `threshold = 0.5 s`.
+La fase de vuelo real dura ~172 ms (zancada 3.07 Hz, duty 0.47), o sea **2.9x por debajo del
+umbral**, así que el paréntesis es siempre negativo: el término **cobra ~-0.05 por episodio en vez
+de premiar**. Está penalizando cada pisada, y la respuesta óptima de la política es dar pasos
+cortos y rasantes — exactamente el arrastre observado. Verificado en los logs de entrenamiento:
+
+```
+Episode_Reward/feet_air_time: -0.0566   (baseline_ar)
+Episode_Reward/feet_air_time: -0.0534   (exp_001)
+```
+
+Esto es un bug de configuración, no una preferencia: el docstring de la función dice que su
+propósito es "ensure that the robot lifts its feet off the ground and takes steps".
+
 Backlog para las primeras noches (una hipótesis por experimento):
-  1. `foot_clearance` w=0.5, `target_height` 5 cm — activar el término (Spot usa 0.1 con base a
-     0.5 m; 0.05 con base a 0.3 m es la proporción equivalente).
-  2. `foot_clearance` w=1.5, 5 cm — variante agresiva, para ver la dirección del trade-off.
-  3. `foot_clearance` w=1.0, 3 cm — objetivo más modesto por si 5 cm satura el término.
-  4. `foot_clearance` w=1.0 + `feet_air_time` 1.0 — altura y duración juntas: zancada con forma.
-  5. `undesired_contacts` -1.0 → -3.0 — contener las caídas de hombro, que pueden empeorar al
-     pasar más tiempo en apoyo de tres patas.
-  6. `entropy_coef` 0.005 → 0.002 — explotar la marcha ya lograda.
-  7. `learning_rate` 1e-3 → 5e-4 — refinar sin los saltos del schedule adaptativo.
-  8. Red más grande `[512,256,128]` — más capacidad para coordinación fina. VRAM: la baseline usa
-     ~4.4 GB de 16.3 GB en régimen estable, hay margen.
+  1. `foot_clearance` w=0.5, `target_height` 5 cm — activar el término de altura.
+  2. **`feet_air_time.params.threshold` 0.5 → 0.12 s** — invierte el signo del término y recién
+     ahí premia el vuelo. Se prueba aislado, sin clearance, para atribuir el efecto.
+  3. Umbral corregido + clearance activado — la combinación que debería dar la mejor zancada.
+  4. `foot_clearance` w=1.5, 5 cm — variante agresiva.
+  5. `foot_clearance` w=1.0, 3 cm — objetivo más modesto por si 5 cm satura.
+  6. `foot_clearance` w=1.0 + `feet_air_time` w=1.0 — altura y duración con pesos altos.
+  7. `undesired_contacts` -1.0 → -3.0 — contener caídas de hombro, que pueden empeorar al pasar
+     más tiempo en apoyo de tres patas.
+  8. Red más grande `[512,256,128]`. VRAM: la baseline usa ~4.4 GB de 16.3 GB, hay margen.
 
 `research/run_night.py` ya tiene esta cola cargada y lista para correr sin supervisión.
 
 **Al mirar resultados**: un score alto con `foot_clearance_peak_m` bajo significa que el
-experimento mejoró otras cosas sin resolver el problema de fondo. Mirá siempre esa columna.
+experimento mejoró otras cosas sin resolver el problema de fondo. Mirá siempre esa columna, y
+mirá `Episode_Reward/<termino>` en el log de entrenamiento para confirmar que cada término aporta
+con el signo que se espera.
