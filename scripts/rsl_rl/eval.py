@@ -93,11 +93,19 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
     state["shoulder_falls"] += int(term_manager.get_term("shoulder_contact").sum().item())
     state["episodes"] += int(dones.sum().item())
 
-    # foot impact force: force magnitude on each foot at the instant it touches down
+    # foot contact analysis: impact force, stride frequency, and duty factor per foot
     contact_sensor = env.unwrapped.scene.sensors["contact_forces"]
     if state["foot_ids"] is None:
-        state["foot_ids"], _ = contact_sensor.find_bodies(".*hand_link")
+        state["foot_ids"], state["foot_names"] = contact_sensor.find_bodies(".*hand_link")
+        num_feet = len(state["foot_ids"])
+        state["foot_touchdowns"] = torch.zeros(num_feet, device=env.unwrapped.device)
+        state["foot_contact_steps"] = torch.zeros(num_feet, device=env.unwrapped.device)
+
     first_contact = contact_sensor.compute_first_contact(env.unwrapped.step_dt)[:, state["foot_ids"]]
+    in_contact = contact_sensor.data.current_contact_time[:, state["foot_ids"]] > 0.0
+    state["foot_touchdowns"] += first_contact.sum(dim=0).float()
+    state["foot_contact_steps"] += in_contact.sum(dim=0).float()
+
     foot_forces = torch.norm(contact_sensor.data.net_forces_w[:, state["foot_ids"], :], dim=-1)
     impact_forces = foot_forces[first_contact]
     if impact_forces.numel() > 0:
@@ -153,29 +161,19 @@ def compute_movement_smoothness(joint_positions):
     return float(smoothness)
 
 
-def compute_movement_frequency(joint_positions, dt=0.02):
-    """Estimate dominant frequency using FFT."""
-    if len(joint_positions) < 10:
-        return 0.0
+def compute_gait_metrics(foot_touchdowns, foot_contact_steps, foot_names, num_envs: int, num_steps: int, step_dt: float):
+    """Compute per-foot stride frequency (Hz) and duty factor from accumulated contact events."""
+    total_time = num_steps * step_dt
+    total_samples = num_envs * num_steps
+    touchdowns = foot_touchdowns.cpu().numpy()
+    contact_steps = foot_contact_steps.cpu().numpy()
 
-    positions = np.array(joint_positions)  # Shape: (num_steps, num_envs, num_joints)
-
-    # Use only first env and first joint for frequency analysis
-    signal_data = positions[:, 0, 0]
-
-    # Compute FFT
-    fft = np.fft.fft(signal_data)
-    freqs = np.fft.fftfreq(len(signal_data), d=dt)
-
-    # Get positive frequencies only
-    positive_freqs = freqs[:len(freqs)//2]
-    power = np.abs(fft[:len(fft)//2])
-
-    # Find dominant frequency (excluding DC component)
-    dominant_idx = np.argmax(power[1:]) + 1
-    dominant_freq = positive_freqs[dominant_idx]
-
-    return float(np.abs(dominant_freq))
+    stride_frequency_per_foot = {}
+    duty_factor_per_foot = {}
+    for i, name in enumerate(foot_names):
+        stride_frequency_per_foot[name] = float(touchdowns[i] / num_envs / total_time) if total_time > 0 else 0.0
+        duty_factor_per_foot[name] = float(contact_steps[i] / total_samples) if total_samples > 0 else 0.0
+    return stride_frequency_per_foot, duty_factor_per_foot
 
 
 def quat_to_euler(quat):
@@ -264,7 +262,21 @@ def compute_results(env, state: dict) -> dict:
 
     # Calculate movement metrics
     smoothness = compute_movement_smoothness(state["joint_positions"]) if state["joint_positions"] else 0.0
-    frequency = compute_movement_frequency(state["joint_positions"]) if state["joint_positions"] else 0.0
+
+    # Calculate gait metrics (stride frequency and duty factor) from foot contact events
+    stride_frequency_per_foot = {}
+    duty_factor_per_foot = {}
+    if state["foot_touchdowns"] is not None:
+        stride_frequency_per_foot, duty_factor_per_foot = compute_gait_metrics(
+            state["foot_touchdowns"],
+            state["foot_contact_steps"],
+            state["foot_names"],
+            env.unwrapped.num_envs,
+            args_cli.num_steps,
+            env.unwrapped.step_dt,
+        )
+    stride_frequency_mean = float(np.mean(list(stride_frequency_per_foot.values()))) if stride_frequency_per_foot else 0.0
+    duty_factor_mean = float(np.mean(list(duty_factor_per_foot.values()))) if duty_factor_per_foot else 0.0
 
     # Calculate orientation metrics
     orientation_stability = compute_orientation_stability(state["base_quats"]) if state["base_quats"] else 0.0
@@ -286,7 +298,10 @@ def compute_results(env, state: dict) -> dict:
         "impact_force_std": impact_var**0.5 if impact_var > 0 else 0.0,
         "impact_force_max": state["impact_force_max"],
         "movement_smoothness": smoothness,
-        "movement_frequency_hz": frequency,
+        "stride_frequency_hz_mean": stride_frequency_mean,
+        "stride_frequency_hz_per_foot": stride_frequency_per_foot,
+        "duty_factor_mean": duty_factor_mean,
+        "duty_factor_per_foot": duty_factor_per_foot,
         "orientation_stability_0to1": orientation_stability,
         "orientation_smoothness_0to1": orientation_smoothness,
         "velocity_tracking_accuracy_0to1": velocity_tracking,
@@ -375,6 +390,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "shoulder_falls": 0,
         "episodes": 0,
         "foot_ids": None,
+        "foot_names": None,
+        "foot_touchdowns": None,
+        "foot_contact_steps": None,
         "impact_force_sum": 0.0,
         "impact_force_sq_sum": 0.0,
         "impact_force_count": 0,
