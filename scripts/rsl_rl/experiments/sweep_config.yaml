@@ -1,0 +1,40 @@
+# AutoResearch sweep - automatically varies hyperparameters
+# Autoresearch will generate all combinations
+
+base_experiment:
+  task: "Dyna1-Flat-v0"
+  num_steps: 5000
+
+# Parameters to sweep (autoresearch generates all combinations)
+sweeps:
+  feet_air_time_weight:
+    - 0.22    # original
+    - 0.3
+    - 0.5
+    - 0.8
+
+  action_rate_weight:
+    - -0.1    # original
+    - -0.2
+    - -0.5
+
+  lin_vel_z_weight:
+    - -2.0    # original
+    - -1.0
+    - -0.5
+
+  learning_rate:
+    - 1.0e-3  # original
+    - 5.0e-4
+    - 1.0e-4
+
+# Template command - {VAR} gets replaced with sweep values
+command_template: |
+  python scripts/rsl_rl/train_delay.py \
+    --task={task} \
+    --headless \
+    --num_envs=4096 \
+    --name=sweep_lr{learning_rate}_air{feet_air_time_weight}_rate{action_rate_weight} \
+    --experiment_config=scripts/rsl_rl/experiment_configs/custom_sweep.yaml
+
+# This will generate N experiments (3x3x3x4 = 108 experiments)

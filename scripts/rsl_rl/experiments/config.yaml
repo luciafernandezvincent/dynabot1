@@ -1,0 +1,29 @@
+# AutoResearch configuration for dynabot1 evaluation
+# Each experiment runs eval.py with different parameters
+
+experiments:
+  baseline:
+    cmd: "python scripts/rsl_rl/eval.py --task=Dyna1-Flat-v0 --load_run=baseline_test --num_steps=5000"
+    results_file: "logs/rsl_rl/anymal_d_flat/eval/results.json"
+
+  smooth_gait:
+    cmd: "python scripts/rsl_rl/eval.py --task=Dyna1-Flat-v0 --load_run=smooth_gait --num_steps=5000"
+    results_file: "logs/rsl_rl/anymal_d_flat/eval/results.json"
+
+  slower_gait:
+    cmd: "python scripts/rsl_rl/eval.py --task=Dyna1-Flat-v0 --load_run=slower_gait --num_steps=5000"
+    results_file: "logs/rsl_rl/anymal_d_flat/eval/results.json"
+
+  high_mass_randomization:
+    cmd: "python scripts/rsl_rl/eval.py --task=Dyna1-Flat-v0 --load_run=baseline_test --num_steps=5000"
+    results_file: "logs/rsl_rl/anymal_d_flat/eval/results.json"
+
+# Metrics to track and compare
+metrics:
+  - "movement_smoothness"
+  - "orientation_stability_0to1"
+  - "orientation_smoothness_0to1"
+  - "velocity_tracking_accuracy_0to1"
+  - "movement_frequency_hz"
+  - "impact_force_mean"
+  - "fall_rate_per_episode"
