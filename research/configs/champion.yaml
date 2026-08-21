@@ -50,14 +50,13 @@ agent:
     lam: 0.95
     desired_kl: 0.01
     max_grad_norm: 1.0
-  policy:
-    actor_hidden_dims:
-    - 128
-    - 128
-    - 128
-    critic_hidden_dims:
-    - 128
-    - 128
-    - 128
-    activation: elu
-    init_noise_std: 1.0
+  # policy.actor_hidden_dims/critic_hidden_dims esta DEPRECADO en esta version de rsl-rl-lib
+  # (>=4.0.0): el shim de compatibilidad lo usa para poblar actor/critic y despues lo vacia,
+  # antes de que un YAML pueda tocarlo. El campo real es actor.hidden_dims / critic.hidden_dims
+  # (encontrado tras exp_008: el primer intento entreno con la red chica de siempre sin avisar).
+  actor:
+    hidden_dims: [128, 128, 128]
+    activation: "elu"
+  critic:
+    hidden_dims: [128, 128, 128]
+    activation: "elu"

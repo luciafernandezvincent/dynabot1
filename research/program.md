@@ -311,3 +311,25 @@ Van 5 experimentos sobre el campeón (`exp_002`, `_004`, `_009`, `_010`, `_011`)
 superó. El campeón (`foot_clearance` w=0.5, target 5cm, solo) sigue siendo difícil de mejorar por
 esta familia de rewards. Vías no probadas aún: `exp_005` (target más bajo, 3cm, con w=1.0),
 hiperparámetros de PPO, o combinar clearance bajo + air_time_variance bajo (sin gait).
+
+
+## Bug encontrado: la red grande nunca se entreno (21/08/2026)
+
+`exp_008` (primer intento) uso `agent.policy.actor_hidden_dims` / `critic_hidden_dims`, que en
+esta version de `rsl-rl-lib` (5.0.1, >=4.0.0) esta **deprecado**. El shim de compatibilidad
+`handle_deprecated_rsl_rl_cfg` corre ANTES de aplicar el YAML del experimento: usa `policy` para
+poblar los campos reales `actor`/`critic`, y despues **vacia `policy`**. El YAML terminaba
+seteando un campo ya descartado, sin error ni warning visible.
+
+Confirmado con evidencia dura: el checkpoint `model_1499.pt` de ese primer intento es **byte-
+identico** (mismo MD5) al del campeon — entreno con la red chica de siempre, no con `[512,256,128]`
+como decia el config. El score idéntico a 4 decimales debería haber sido la primera señal.
+
+**Campo correcto**: `agent.actor.hidden_dims` / `agent.critic.hidden_dims`. Corregido en
+`exp_008_bigger_net.yaml` y relanzado. `baseline.yaml` y `champion.yaml` tenían el mismo bloque
+`policy:` muerto — no afectaba resultados porque coincidía por casualidad con el default real
+([128,128,128]), pero se limpió para que nadie confíe en ese campo a futuro.
+
+**Chequeo para la próxima vez que un experimento no mueva la aguja**: comparar el MD5 del
+checkpoint contra el del campeón. Si son iguales, el override no se aplicó — no es que el cambio
+no importe.

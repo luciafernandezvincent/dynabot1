@@ -1,7 +1,13 @@
+# CORREGIDO (21/08): la primera version usaba agent.policy.actor_hidden_dims, que en esta
+# version de rsl-rl-lib (5.0.1, >=4.0.0) esta deprecado. El shim handle_deprecated_rsl_rl_cfg
+# usa 'policy' para poblar 'actor'/'critic' y despues LO VACIA, antes de que se aplique el YAML.
+# Resultado: el primer intento entreno con la red chica de siempre (checkpoint byte-identico al
+# campeon, mismo MD5). El campo real es agent.actor.hidden_dims / agent.critic.hidden_dims.
+#
 # Hipotesis: la red [128,128,128] de la config flat puede quedarse corta para afinar coordinacion
-# fina (menos impacto, menos caidas de hombro). La config rough usa [512,256,128]. Ojo: sube el
-# uso de VRAM (baseline usa ~4.4 GB en regimen estable, hay margen).
+# fina (menos impacto, menos caidas de hombro). La config rough usa [512,256,128].
 agent:
-  policy:
-    actor_hidden_dims: [512, 256, 128]
-    critic_hidden_dims: [512, 256, 128]
+  actor:
+    hidden_dims: [512, 256, 128]
+  critic:
+    hidden_dims: [512, 256, 128]
