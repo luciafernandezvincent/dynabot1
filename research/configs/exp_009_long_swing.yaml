@@ -1,19 +1,18 @@
-# OBJETIVO: swing mas largo. Hoy el swing dura 173 ms (baseline) / 197 ms (exp_001).
+# OBJETIVO: swing mas largo (hoy 197 ms con el campeon exp_001).
 #
-# Mecanica: reward = (last_air_time - threshold) * first_contact, pagado en cada aterrizaje.
-# La tasa por segundo es f * ((1-D)/f - thr) = (1-D) - thr*f. Con thr > 0 la tasa BAJA con la
-# frecuencia, o sea el termino paga por pasos menos frecuentes y mas largos... pero solo si thr
-# esta por debajo del swing real, que no es el caso hoy (thr=0.5 s vs swing de 0.17 s).
+# CORREGIDO tras el resultado de exp_002: bajar el threshold de feet_air_time EMPEORA. Medido:
+# swing 197 -> 127 ms, zancada 2.56 -> 3.96 Hz, caidas +56%, score 0.5837 -> 0.4459.
+# Razon: el termino nunca cruza a positivo (se queda en -0.0057), y estando en zona negativa un
+# threshold mas chico abarata el castigo por pisada, asi que la politica pisa MAS seguido. El
+# gradiente va al reves de lo que se esperaba.
 #
-# Hipotesis: thr = 0.12 s (debajo del swing real, invierte el signo) MAS peso 2.0 (4x) para que
-# el termino tenga fuerza real frente al resto. Deberia estirar el swing y bajar la frecuencia.
+# Lo que si funciona es foot_clearance: es el unico que estiro el swing (172 -> 197 ms) y ademas
+# bajo caidas 87% e impacto 32%. Hipotesis: subir la altura objetivo obliga a un arco mas alto,
+# que necesariamente toma mas tiempo -> swing mas largo. Se sube target_height de 5 a 8 cm
+# manteniendo el peso, sobre el campeon. feet_air_time queda en su valor de baseline.
 env:
   rewards:
-    feet_air_time:
-      weight: 2.0
-      params:
-        threshold: 0.12
     foot_clearance:
-      weight: 0.5
+      weight: 1.0
       params:
-        target_height: 0.05
+        target_height: 0.08

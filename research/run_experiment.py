@@ -47,6 +47,9 @@ TRAIN_NUM_ENVS = 4096
 SEED = 42
 EVAL_NUM_ENVS = 1000
 EVAL_NUM_STEPS = 1000
+VIDEO_NUM_ENVS = 10  # perros en pantalla
+VIDEO_LENGTH_STEPS = 300  # 300 pasos * 0.02 s de step_dt = 6 s de video
+VIDEO_TIMEOUT_S = 900
 TRAIN_TIMEOUT_S = 5400
 EVAL_TIMEOUT_S = 2400
 
@@ -255,6 +258,7 @@ def main() -> int:
     parser.add_argument("--num-envs", type=int, default=TRAIN_NUM_ENVS, help="Envs de entrenamiento")
     parser.add_argument("--seed", type=int, default=SEED, help="Semilla (fija para comparar)")
     parser.add_argument("--eval-only", action="store_true", help="Saltea el entrenamiento y evalua el checkpoint existente")
+    parser.add_argument("--no-video", action="store_true", help="No grabar el video de la marcha al final")
     parser.add_argument("--dry-run", action="store_true", help="Valida el config e imprime los comandos, sin correr")
     parser.add_argument("--rebuild-table", action="store_true", help="Solo regenera RESULTS.md desde results.jsonl")
     parser.add_argument("--rescore", action="store_true",
@@ -387,6 +391,37 @@ def main() -> int:
         print(f"[ERROR] Evaluacion fallida (rc={returncode}). Ultimas lineas:\n{tail}", file=sys.stderr)
         return 1
     record["eval_seconds"] = round(time.time() - eval_started, 1)
+
+    # video de la marcha: VIDEO_NUM_ENVS perros durante VIDEO_LENGTH_STEPS pasos. Va despues del
+    # eval y su resultado no afecta el score: si falla, se registra y se sigue.
+    if not args.no_video:
+        video_cmd = [
+            sys.executable, "scripts/rsl_rl/play.py",
+            f"--task={TASK}",
+            "--headless",
+            "--video",
+            f"--video_length={VIDEO_LENGTH_STEPS}",
+            f"--load_run={name}",
+            f"--num_envs={VIDEO_NUM_ENVS}",
+            f"--seed={args.seed}",
+        ]
+        video_started = time.time()
+        returncode, tail = run_command(video_cmd, run_dir / "video.log", VIDEO_TIMEOUT_S)
+        record["video_seconds"] = round(time.time() - video_started, 1)
+        if returncode == 0:
+            # play.py deja el mp4 en <log_dir>/videos/play/rl-video-step-0.mp4; se copia al
+            # directorio del experimento con el nombre del experimento, que es lo que se mira.
+            produced = sorted((log_dir / "videos" / "play").glob("*.mp4"))
+            if produced:
+                destination = run_dir / f"{name}.mp4"
+                destination.write_bytes(produced[-1].read_bytes())
+                record["video_path"] = str(destination.relative_to(REPO_ROOT))
+                print(f"[INFO] Video: {destination}")
+            else:
+                print(f"[WARN] play.py termino ok pero no dejo ningun mp4 en {log_dir / 'videos' / 'play'}")
+        else:
+            print(f"[WARN] No se pudo grabar el video (rc={returncode}); el experimento sigue siendo valido")
+            record["video_error"] = tail[-500:]
 
     results_path = log_dir / "eval" / "results.json"
     if not results_path.exists():

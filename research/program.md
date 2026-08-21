@@ -243,3 +243,29 @@ Backlog para las primeras noches (una hipótesis por experimento):
 experimento mejoró otras cosas sin resolver el problema de fondo. Mirá siempre esa columna, y
 mirá `Episode_Reward/<termino>` en el log de entrenamiento para confirmar que cada término aporta
 con el signo que se espera.
+
+
+## Resultados y lecciones (21/08/2026)
+
+| experimento | score | despeje pico | swing | zancada | caídas/ep |
+|---|---|---|---|---|---|
+| `baseline_ar` | 0.4790 | 22.9 mm | 172 ms | 3.07 Hz | 0.023 |
+| `exp_001_clearance_on` | **0.5837** | **40.6 mm** | **197 ms** | 2.56 Hz | **0.003** |
+| `exp_002_airtime_threshold_fix` | 0.4459 | 23.9 mm | 127 ms | 3.96 Hz | 0.036 |
+
+**Lección 1 — `foot_clearance` es la palanca que funciona.** Activarlo (w=0.5, 5 cm) subió el
+despeje 77%, estiró el swing, y de yapa bajó caídas 87% e impacto 32%, todo sin costar
+seguimiento de velocidad (0.972 → 0.975). Es el campeón vigente.
+
+**Lección 2 — bajar el `threshold` de `feet_air_time` es CONTRAPRODUCENTE, al revés de lo que
+predije.** El razonamiento era: la tasa del término es `(1-D) - thr*f`, así que con `thr` menor
+la política debería preferir pasos largos. Falso. El término **nunca cruza a positivo** (se queda
+en -0.0057): estando en zona negativa, un `thr` más chico abarata el castigo por pisada, así que
+la política **pisa más seguido**. Resultado: swing 197 → 127 ms, zancada 3.96 Hz, caídas +56%.
+El gradiente va al revés del análisis en el límite. **No volver a bajar ese umbral** sin antes
+conseguir que el término sea positivo (haría falta un swing > threshold, que a estas frecuencias
+no ocurre).
+
+**Cómo leer esto para el resto de la cola**: el swing se estira por la vía de la ALTURA
+(`foot_clearance.target_height`), no por la vía del tiempo (`feet_air_time`). Un arco más alto
+toma más tiempo por geometría.
