@@ -266,6 +266,17 @@ El gradiente va al revés del análisis en el límite. **No volver a bajar ese u
 conseguir que el término sea positivo (haría falta un swing > threshold, que a estas frecuencias
 no ocurre).
 
+**Lección 3 — pedir más despeje da menos: el reward satura.** `exp_009` subió `target_height`
+de 5 a 8 cm y el despeje BAJÓ (40.6 → 33.3 mm), score 0.5837 → 0.5694. El término es
+`exp(-error²/std)` con `std=0.05`: con un objetivo de 8 cm y un pie que llega a 3, el error al
+cuadrado aplana la exponencial y el gradiente se desvanece. El objetivo tiene que quedar dentro
+del rango alcanzable para que discrimine. La vía correcta es subir el PESO con objetivo
+alcanzable (`exp_004`: w=1.5, 5 cm), no alejar el objetivo.
+
+**Lección 4 — la asimetría empeora cuanto más levanta las patas.** Ratio entre la pata que más
+despega y la que menos: 3.2x (baseline) → 3.8x (campeón) → 3.9x (`exp_009`). Ninguna métrica del
+score lo penaliza todavía; `exp_011` (`air_time_variance`) pasa a ser prioritario.
+
 **Cómo leer esto para el resto de la cola**: el swing se estira por la vía de la ALTURA
 (`foot_clearance.target_height`), no por la vía del tiempo (`feet_air_time`). Un arco más alto
 toma más tiempo por geometría.

@@ -36,11 +36,10 @@ PYTHON = "/home/linar/miniconda3/envs/env_isaaclab/bin/python"
 # YAML). Se corren en este orden porque exp_001/002/003 atacan el problema mas grave medido
 # (la baseline sigue el comando de velocidad peor que quedarse quieta).
 QUEUE = [
-    ("exp_009_long_swing.yaml", "exp_009_long_swing", "clearance target 8cm, swing mas largo"),
+    ("exp_011_symmetry.yaml", "exp_011_symmetry", "air_time_variance w=-1.0: la asimetria empeora al subir el despeje"),
+    ("exp_004_clearance_strong.yaml", "exp_004_clearance_strong", "clearance w=1.5 target 5cm: mas peso, objetivo alcanzable"),
     ("exp_010_trot_gait.yaml", "exp_010_trot_gait", "GaitReward w=5.0, sincronizar diagonales (trote)"),
-    ("exp_011_symmetry.yaml", "exp_011_symmetry", "air_time_variance w=-1.0, corregir asimetria 4x entre patas"),
-    ("exp_004_clearance_strong.yaml", "exp_004_clearance_strong", "foot_clearance w=1.5 target 5cm"),
-    ("exp_005_clearance_low_target.yaml", "exp_005_clearance_low_target", "foot_clearance w=1.0 target 3cm"),
+    ("exp_005_clearance_low_target.yaml", "exp_005_clearance_low_target", "clearance w=1.0 target 3cm"),
     ("exp_012_elegant_combo.yaml", "exp_012_elegant_combo", "combo: clearance + trote + simetria"),
     ("exp_007_clearance_plus_contacts.yaml", "exp_007_clearance_plus_contacts", "undesired_contacts 3x, caidas de hombro"),
     ("exp_008_bigger_net.yaml", "exp_008_bigger_net", "red actor/critic mas grande [512,256,128]"),

@@ -246,6 +246,44 @@ def write_results_table() -> None:
     print(f"[INFO] Tabla actualizada: {RESULTS_MD}")
 
 
+def record_video(name: str, run_dir: Path, log_dir: Path, seed: int) -> tuple[str | None, float, str | None]:
+    """Graba un video de la marcha con VIDEO_NUM_ENVS perros y lo deja en el dir del experimento.
+
+    Corre despues del eval y antes de devolver el control, para que una cola secuencial nunca
+    solape un play.py con el entrenamiento del experimento siguiente. Su resultado no afecta al
+    score: si falla, se registra el error y el experimento sigue siendo valido.
+    """
+    video_cmd = [
+        sys.executable, "scripts/rsl_rl/play.py",
+        f"--task={TASK}",
+        "--headless",
+        "--video",
+        f"--video_length={VIDEO_LENGTH_STEPS}",
+        f"--load_run={name}",
+        f"--num_envs={VIDEO_NUM_ENVS}",
+        f"--seed={seed}",
+    ]
+    started = time.time()
+    run_dir.mkdir(parents=True, exist_ok=True)
+    returncode, tail = run_command(video_cmd, run_dir / "video.log", VIDEO_TIMEOUT_S)
+    elapsed = round(time.time() - started, 1)
+
+    if returncode != 0:
+        print(f"[WARN] No se pudo grabar el video (rc={returncode}); el experimento sigue siendo valido")
+        return None, elapsed, tail[-500:]
+
+    # play.py deja el mp4 en <log_dir>/videos/play/; se copia al dir del experimento con su nombre
+    produced = sorted((log_dir / "videos" / "play").glob("*.mp4"))
+    if not produced:
+        print(f"[WARN] play.py termino ok pero no dejo ningun mp4 en {log_dir / 'videos' / 'play'}")
+        return None, elapsed, "sin mp4 generado"
+
+    destination = run_dir / f"{name}.mp4"
+    destination.write_bytes(produced[-1].read_bytes())
+    print(f"[INFO] Video: {destination}")
+    return str(destination.relative_to(REPO_ROOT)), elapsed, None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Corre un experimento de autoresearch (train + eval + score)")
     parser.add_argument("--config", type=Path, default=None,
@@ -259,6 +297,8 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=SEED, help="Semilla (fija para comparar)")
     parser.add_argument("--eval-only", action="store_true", help="Saltea el entrenamiento y evalua el checkpoint existente")
     parser.add_argument("--no-video", action="store_true", help="No grabar el video de la marcha al final")
+    parser.add_argument("--video-only", action="store_true",
+                        help="Solo grabar el video desde el checkpoint existente, sin entrenar ni evaluar")
     parser.add_argument("--dry-run", action="store_true", help="Valida el config e imprime los comandos, sin correr")
     parser.add_argument("--rebuild-table", action="store_true", help="Solo regenera RESULTS.md desde results.jsonl")
     parser.add_argument("--rescore", action="store_true",
@@ -266,6 +306,17 @@ def main() -> int:
     parser.add_argument("--accept-judge-change", action="store_true",
                         help="Acepta que score.py / eval.py cambiaron y re-fija la referencia (invalida comparaciones previas)")
     args = parser.parse_args()
+
+    if args.video_only:
+        if args.name is None:
+            print("[ERROR] --video-only necesita --name", file=sys.stderr)
+            return 1
+        log_dir = REPO_ROOT / "logs" / "rsl_rl" / EXPERIMENT_NAME / args.name
+        if not log_dir.exists():
+            print(f"[ERROR] No existe la corrida {log_dir}", file=sys.stderr)
+            return 1
+        path, _, error = record_video(args.name, RUNS_DIR / args.name, log_dir, args.seed)
+        return 0 if path else 1
 
     if args.rescore:
         # re-fijar el hash del juez ANTES de salir por este camino: si no, un --rescore
@@ -392,36 +443,13 @@ def main() -> int:
         return 1
     record["eval_seconds"] = round(time.time() - eval_started, 1)
 
-    # video de la marcha: VIDEO_NUM_ENVS perros durante VIDEO_LENGTH_STEPS pasos. Va despues del
-    # eval y su resultado no afecta el score: si falla, se registra y se sigue.
     if not args.no_video:
-        video_cmd = [
-            sys.executable, "scripts/rsl_rl/play.py",
-            f"--task={TASK}",
-            "--headless",
-            "--video",
-            f"--video_length={VIDEO_LENGTH_STEPS}",
-            f"--load_run={name}",
-            f"--num_envs={VIDEO_NUM_ENVS}",
-            f"--seed={args.seed}",
-        ]
-        video_started = time.time()
-        returncode, tail = run_command(video_cmd, run_dir / "video.log", VIDEO_TIMEOUT_S)
-        record["video_seconds"] = round(time.time() - video_started, 1)
-        if returncode == 0:
-            # play.py deja el mp4 en <log_dir>/videos/play/rl-video-step-0.mp4; se copia al
-            # directorio del experimento con el nombre del experimento, que es lo que se mira.
-            produced = sorted((log_dir / "videos" / "play").glob("*.mp4"))
-            if produced:
-                destination = run_dir / f"{name}.mp4"
-                destination.write_bytes(produced[-1].read_bytes())
-                record["video_path"] = str(destination.relative_to(REPO_ROOT))
-                print(f"[INFO] Video: {destination}")
-            else:
-                print(f"[WARN] play.py termino ok pero no dejo ningun mp4 en {log_dir / 'videos' / 'play'}")
-        else:
-            print(f"[WARN] No se pudo grabar el video (rc={returncode}); el experimento sigue siendo valido")
-            record["video_error"] = tail[-500:]
+        video_path, video_seconds, video_error = record_video(name, run_dir, log_dir, args.seed)
+        record["video_seconds"] = video_seconds
+        if video_path:
+            record["video_path"] = video_path
+        if video_error:
+            record["video_error"] = video_error
 
     results_path = log_dir / "eval" / "results.json"
     if not results_path.exists():
