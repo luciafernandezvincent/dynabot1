@@ -1,0 +1,6 @@
+# Hipotesis: al reves de lo que se penso originalmente (la baseline ya camina bien, no le hace
+# falta explorar mas). Menos entropia deberia ayudar a explotar y refinar la marcha ya buena,
+# en vez de seguir probando variantes que puedan inducir caidas.
+agent:
+  algorithm:
+    entropy_coef: 0.002

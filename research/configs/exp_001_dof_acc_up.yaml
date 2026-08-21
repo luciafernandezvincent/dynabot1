@@ -1,0 +1,11 @@
+# DIAGNOSTICO CORREGIDO (21/08): la baseline con el codigo actual camina bien de entrada
+# (tracking 0.972, zancada 3.07 Hz, duty 0.47). Los puntos flojos reales son: suavidad de
+# movimiento (norm 0.583), impacto (0.468) y caidas de hombro (23/1000 episodios).
+#
+# Hipotesis: dof_acc_l2 = -2.5e-7 es un peso minusculo frente al resto de penalizaciones.
+# Subirlo 4x deberia bajar la aceleracion articular (mas suave) sin tocar mucho el tracking,
+# que ya esta cerca del techo.
+env:
+  rewards:
+    dof_acc_l2:
+      weight: -1.0e-6

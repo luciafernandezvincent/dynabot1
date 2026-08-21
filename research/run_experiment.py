@@ -255,9 +255,26 @@ def main() -> int:
     parser.add_argument("--eval-only", action="store_true", help="Saltea el entrenamiento y evalua el checkpoint existente")
     parser.add_argument("--dry-run", action="store_true", help="Valida el config e imprime los comandos, sin correr")
     parser.add_argument("--rebuild-table", action="store_true", help="Solo regenera RESULTS.md desde results.jsonl")
+    parser.add_argument("--rescore", action="store_true",
+                        help="Re-scorea todo results.jsonl con la version actual de score.py (usar tras recalibrar) y regenera la tabla")
     parser.add_argument("--accept-judge-change", action="store_true",
                         help="Acepta que score.py / eval.py cambiaron y re-fija la referencia (invalida comparaciones previas)")
     args = parser.parse_args()
+
+    if args.rescore:
+        records = load_records()
+        for r in records:
+            if r.get("status") == "ok" and "metrics" in r:
+                scored = score_results(r["metrics"])
+                r["score"] = scored["score"]
+                r["valid"] = scored["valid"]
+                r["score_breakdown"] = scored
+        with open(RESULTS_JSONL, "w") as f:
+            for r in records:
+                f.write(json.dumps(r) + "\n")
+        write_results_table()
+        print(f"[INFO] Re-scoreados {len(records)} registros con la version actual de score.py")
+        return 0
 
     if args.rebuild_table:
         write_results_table()

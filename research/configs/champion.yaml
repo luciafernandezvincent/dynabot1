@@ -1,0 +1,67 @@
+# CAMPEON VIGENTE (generado automaticamente, no editar a mano). run_night.py lo actualiza
+# solo si un experimento mejora el score. Arranca como copia de baseline.yaml.
+
+# Baseline: snapshot FIEL de los valores efectivos de Dyna1-Flat-v0 tal como esta el codigo
+# (verificado contra logs/rsl_rl/anymal_d_flat/2026-08-20_16-18-55/params/env.yaml).
+#
+# Correr la baseline es equivalente a correr sin --config:
+#   python research/run_experiment.py --name baseline_ar --notes "referencia"
+#
+# Este archivo es SOLO REFERENCIA para saber de que valores se parte. Los experimentos NO se
+# escriben copiando este archivo entero: se escribe unicamente el delta (ver research/program.md).
+#
+# OJO: scripts/rsl_rl/experiment_configs/baseline.yaml dice ser "the code defaults" pero NO lo es
+# (usa track_lin_vel_xy_exp 1.0, feet_air_time 0.22, flat_orientation_l2 -1e-4). No usarlo.
+
+env:
+  episode_length_s: 20.0
+  rewards:
+    # -- tarea
+    track_lin_vel_xy_exp:
+      weight: 1.5
+    track_ang_vel_z_exp:
+      weight: 0.75
+    # -- penalizaciones
+    lin_vel_z_l2:
+      weight: -2.0
+    ang_vel_xy_l2:
+      weight: -0.05
+    dof_torques_l2:
+      weight: -2.5e-5
+    dof_acc_l2:
+      weight: -2.5e-7
+    action_rate_l2:
+      weight: -0.1
+    feet_air_time:
+      weight: 0.5
+      params:
+        threshold: 0.5
+    undesired_contacts:
+      weight: -1.0
+    flat_orientation_l2:
+      weight: -5.0
+    dof_pos_limits:
+      weight: 0.0
+
+agent:
+  num_steps_per_env: 24
+  save_interval: 50
+  empirical_normalization: false
+  algorithm:
+    value_loss_coef: 1.0
+    use_clipped_value_loss: true
+    clip_param: 0.2
+    entropy_coef: 0.005
+    num_learning_epochs: 5
+    num_mini_batches: 4
+    learning_rate: 1.0e-3
+    schedule: "adaptive"
+    gamma: 0.99
+    lam: 0.95
+    desired_kl: 0.01
+    max_grad_norm: 1.0
+  policy:
+    actor_hidden_dims: [128, 128, 128]
+    critic_hidden_dims: [128, 128, 128]
+    activation: "elu"
+    init_noise_std: 1.0

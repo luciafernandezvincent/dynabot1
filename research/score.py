@@ -26,11 +26,14 @@ el peor caso. Lectura directa del score total:
 
 Gate de locomocion
 ------------------
-Medido empiricamente: una politica SIN ENTRENAR, que deja las cuatro patas apoyadas el 99.5%
-del tiempo, saca mejor estabilidad, suavidad, impacto e incluso mejor seguimiento de velocidad
-(0.257) que la baseline entrenada (0.211). O sea: quedarse quieto gana. Para que el loop no
-converja a un perro paralizado, el score se multiplica por un gate de locomocion que vale 1
-cuando el robot camina de verdad y cae a 0 cuando arrastra las patas o casi no da pasos.
+Medido empiricamente (21/08, con una version del codigo anterior a la actual): una politica SIN
+ENTRENAR, que deja las cuatro patas apoyadas el 99.5% del tiempo, saco mejor estabilidad, suavidad,
+impacto e incluso mejor seguimiento de velocidad que una corrida entrenada CUYO results.json
+resulto estar desactualizado (train.py de una version vieja del codigo, antes de que cambiaran los
+pesos de reward). La baseline entrenada con el codigo actual (`baseline_ar`, 21/08/2026) camina
+bien de entrada: tracking 0.972, zancada 3.07 Hz, duty factor 0.47. El gate se deja igual porque
+sigue siendo una red de seguridad correcta ante cualquier config futura que induzca el mismo
+minimo local (quedarse quieto), no porque siga siendo necesario para la baseline actual.
 
 Uso:
     python research/score.py logs/rsl_rl/anymal_d_flat/baseline/eval/results.json
@@ -60,16 +63,17 @@ WEIGHTS = {
 }
 
 # --------------------------------------------------------------------------------------
-# Referencias: valores de la corrida 'baseline' (logs/rsl_rl/anymal_d_flat/baseline, 19/08/2026).
-# Cada termino vale 0.5 cuando la metrica iguala su referencia.
-# Si algun dia se re-define la baseline, actualizar estos numeros y re-scorear todo el historico
-# con:  python research/run_experiment.py --rebuild-table
+# Referencias: valores de la corrida 'baseline_ar' (logs/rsl_rl/anymal_d_flat/baseline_ar,
+# 21/08/2026), entrenada con el protocolo actual del runner (1500 iters x 4096 envs, seed 42)
+# y los defaults del codigo TAL COMO ESTA HOY. Cada termino vale 0.5 cuando la metrica iguala
+# su referencia. Si algun dia se re-define la baseline, actualizar estos numeros y re-scorear
+# todo el historico con:  python research/run_experiment.py --rebuild-table
 # --------------------------------------------------------------------------------------
-REF_VELOCITY_TRACKING = 0.211  # velocity_tracking_accuracy_0to1 (mas es mejor)
-REF_ORIENTATION_VARIANCE = 2.26  # varianza de roll/pitch en rad^2 (menos es mejor)
-REF_ANGULAR_ACC = 19.8  # aceleracion angular media de la base, rad/s^2 (menos es mejor)
-REF_JOINT_ACC = 0.019  # aceleracion articular media, rad/paso^2 (menos es mejor)
-REF_IMPACT_FORCE = 65.9  # fuerza media de pisada en N (menos es mejor)
+REF_VELOCITY_TRACKING = 0.9718  # velocity_tracking_accuracy_0to1 (mas es mejor)
+REF_ORIENTATION_VARIANCE = 0.001118  # varianza de roll/pitch en rad^2 (menos es mejor)
+REF_ANGULAR_ACC = 7.5271  # aceleracion angular media de la base, rad/s^2 (menos es mejor)
+REF_JOINT_ACC = 0.013605  # aceleracion articular media, rad/paso^2 (menos es mejor)
+REF_IMPACT_FORCE = 74.77  # fuerza media de pisada en N (menos es mejor)
 
 #: Banda objetivo de frecuencia de zancada por pata, en Hz (ni arrastrar las patas ni vibrar).
 STRIDE_BAND_HZ = (1.5, 3.5)
@@ -84,8 +88,10 @@ DUTY_GATE_ZERO = 0.90  # duty factor a partir del cual el score se anula
 STRIDE_GATE_FULL_HZ = 1.0  # frecuencia de zancada a partir de la cual no hay penalizacion
 STRIDE_GATE_ZERO_HZ = 0.2  # frecuencia por debajo de la cual el score se anula
 
-#: Referencia medida: seguimiento de velocidad de una politica que se queda quieta. Cualquier
-#: politica util tiene que superarlo; sirve para leer si un experimento realmente camina mejor.
+#: Referencia medida (smoke test de 5 iteraciones): seguimiento de velocidad de una politica que
+#: se queda quieta. Cualquier politica util tiene que superarlo; sirve para leer si un experimento
+#: realmente camina mejor. Muy por debajo de la baseline actual (0.972), asi que en la practica el
+#: gate de locomocion no deberia activarse salvo que algo salga mal.
 STANDSTILL_VELOCITY_TRACKING = 0.257
 
 #: Penalizacion lineal por caidas: score -= FALL_PENALTY * fall_rate_per_episode.

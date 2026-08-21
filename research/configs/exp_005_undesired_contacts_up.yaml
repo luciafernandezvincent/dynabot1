@@ -1,0 +1,7 @@
+# Hipotesis: 23 de 1000 episodios terminan por contacto de hombro (shoulder_contact). Reforzar
+# la penalizacion de contactos indeseados en el brazo (undesired_contacts, de -1.0 a -3.0) podria
+# generalizar a evitar tambien el contacto de hombro, aunque sea un termino de body distinto.
+env:
+  rewards:
+    undesired_contacts:
+      weight: -3.0

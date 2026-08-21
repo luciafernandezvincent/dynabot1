@@ -1,0 +1,7 @@
+# Hipotesis: la red [128,128,128] de la config flat puede quedarse corta para afinar coordinacion
+# fina (menos impacto, menos caidas de hombro). La config rough usa [512,256,128]. Ojo: sube el
+# uso de VRAM (baseline usa ~4.4 GB en regimen estable, hay margen).
+agent:
+  policy:
+    actor_hidden_dims: [512, 256, 128]
+    critic_hidden_dims: [512, 256, 128]

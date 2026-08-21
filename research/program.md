@@ -160,17 +160,43 @@ victoria.
 
 ## Estado conocido al arrancar (21/08/2026)
 
-- La baseline entrenada sigue el comando de velocidad **peor que quedarse quieta** (0.211 vs 0.257).
-  Ese es el problema central: la señal de tarea está siendo aplastada por las penalizaciones.
-- Sospechosos principales, verificados en `params/env.yaml` de un run real:
-  `flat_orientation_l2 = -5.0` (enorme frente a `track_lin_vel_xy_exp = 1.5`), `action_rate_l2 = -0.1`,
-  `feet_air_time = 0.5` con `threshold = 0.5 s` (premia pasos larguísimos, favorece arrastrar).
-- Backlog de ideas para las primeras noches (una por experimento):
-  1. Subir la señal de tarea: `track_lin_vel_xy_exp` 1.5 → 3.0.
-  2. Aflojar la penalización de orientación: `flat_orientation_l2` -5.0 → -0.5.
-  3. Aflojar `action_rate_l2` -0.1 → -0.04.
-  4. `feet_air_time.params.threshold` 0.5 → 0.25 (pasos más frecuentes, menos arrastre).
-  5. Permitir movimiento vertical: `lin_vel_z_l2` -2.0 → -1.0.
-  6. Más exploración: `entropy_coef` 0.005 → 0.01.
-  7. `learning_rate` 1e-3 → 5e-4.
-  8. Red más grande: `actor_hidden_dims` [128,128,128] → [512,256,128] (la config "rough" ya la usa).
+**Corrección importante**: el primer diagnóstico ("la baseline camina peor que quedarse quieta")
+se basó en `logs/rsl_rl/anymal_d_flat/baseline/eval/results.json`, una corrida del **19/08**
+entrenada con una versión del código anterior a los pesos de reward actuales — no era comparable.
+La baseline real (`baseline_ar`, entrenada el 21/08 con el protocolo del runner y los pesos
+actuales del código) **camina bien de entrada**:
+
+| métrica | valor |
+|---|---|
+| velocity_tracking_accuracy_0to1 | 0.972 |
+| stride_frequency_hz_mean | 3.07 (dentro de la banda 1.5–3.5) |
+| duty_factor_mean | 0.47 (trote sano, banda 0.35–0.65) |
+| fall_rate_per_episode | 0.023 (23/1000 episodios, casi todo `shoulder_contact`) |
+| impact_force_mean | 74.8 N |
+| movement_smoothness | 0.987 (norm 0.583 — el término con más margen) |
+| orientation_smoothness_0to1 | 0.117 (norm 0.725) |
+
+`research/score.py` fue recalibrado contra esta baseline correcta (score de referencia ≈ 0.479,
+no 0.5 exacto por la penalización de caídas y el término de marcha ya saturado en 1.0). El score
+histórico se recalculó con `--rebuild-table`.
+
+Con esta baseline, **el objetivo ya no es "lograr que camine"** sino refinar una marcha que
+funciona: menos caídas de hombro, pisadas más suaves (menos fuerza de impacto), menos aceleración
+articular y angular. El gate de locomoción se deja como red de seguridad para cualquier config
+futura que induzca el mínimo local de quedarse quieto, aunque no debería activarse con esta
+baseline.
+
+Backlog revisado para las primeras noches (una hipótesis por experimento, cada una apunta a un
+término específico débil, no a "activar" la marcha):
+  1. `dof_acc_l2` -2.5e-7 → -1.0e-6 (4x) — apunta a `movement_smoothness`.
+  2. `dof_torques_l2` -2.5e-5 → -1.0e-4 (4x) — apunta a `impact_force_mean`.
+  3. `action_rate_l2` -0.1 → -0.2 (2x) — apunta a `orientation_smoothness`.
+  4. `feet_air_time` 0.5 → 0.25 — menos altura de zancada, apunta a `impact_force_mean`.
+  5. `undesired_contacts` -1.0 → -3.0 (3x) — apunta a `fall_rate_per_episode` (caídas de hombro).
+  6. `entropy_coef` 0.005 → 0.002 (menos exploración) — explotar la marcha ya buena.
+  7. `learning_rate` 1e-3 → 5e-4 — refinar sin los saltos del schedule adaptativo.
+  8. Red más grande: `actor_hidden_dims` [128,128,128] → [512,256,128] (la config "rough" ya la usa)
+     — más capacidad para coordinación fina. Ojo VRAM: en régimen estable la baseline usa ~4.4 GB
+     de 16.3 GB, hay margen.
+
+`research/run_night.py` ya tiene esta cola cargada y lista para correr sin supervisión.

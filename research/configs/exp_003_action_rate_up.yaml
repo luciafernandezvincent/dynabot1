@@ -1,0 +1,7 @@
+# Hipotesis: subir action_rate_l2 (de -0.1 a -0.2) suaviza la transicion entre acciones
+# consecutivas, lo que deberia bajar la aceleracion angular de la base (orientation_smoothness,
+# hoy en 0.725) sin sacrificar tracking.
+env:
+  rewards:
+    action_rate_l2:
+      weight: -0.2
