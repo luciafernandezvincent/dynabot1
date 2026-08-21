@@ -106,6 +106,15 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
     state["foot_touchdowns"] += first_contact.sum(dim=0).float()
     state["foot_contact_steps"] += in_contact.sum(dim=0).float()
 
+    # altura de cada pie y si esta apoyado, para medir cuanto despega en el swing
+    articulation_for_feet = env.unwrapped.scene.articulations["robot"]
+    foot_z = articulation_for_feet.data.body_pos_w[:, state["foot_ids"], 2].detach().cpu().numpy()
+    if state["foot_z"] is None:
+        state["foot_z"] = []
+        state["foot_in_contact"] = []
+    state["foot_z"].append(foot_z)
+    state["foot_in_contact"].append(in_contact.detach().cpu().numpy())
+
     foot_forces = torch.norm(contact_sensor.data.net_forces_w[:, state["foot_ids"], :], dim=-1)
     impact_forces = foot_forces[first_contact]
     if impact_forces.numel() > 0:
@@ -188,6 +197,39 @@ def compute_gait_metrics(foot_touchdowns, foot_contact_steps, foot_names, num_en
         stride_frequency_per_foot[name] = float(touchdowns[i] / num_envs / total_time) if total_time > 0 else 0.0
         duty_factor_per_foot[name] = float(contact_steps[i] / total_samples) if total_samples > 0 else 0.0
     return stride_frequency_per_foot, duty_factor_per_foot
+
+
+def compute_foot_clearance(foot_z, foot_in_contact, foot_names):
+    """Cuanto despega cada pie del suelo durante el swing, en metros.
+
+    El origen del body del pie no coincide con la planta, asi que la altura absoluta no sirve
+    como despeje. Se mide relativo a la altura mediana del pie MIENTRAS ESTA APOYADO, que es el
+    cero efectivo de ese pie. Complementa a stride_frequency/duty_factor, que solo miden tiempo
+    de contacto: un pie puede levantarse milimetros y aun asi dar un duty factor perfecto.
+    """
+    if not foot_z:
+        return {}, {}, 0.0, 0.0
+
+    z = np.array(foot_z)  # (num_steps, num_envs, num_feet)
+    contact = np.array(foot_in_contact)  # (num_steps, num_envs, num_feet)
+
+    mean_per_foot = {}
+    peak_per_foot = {}
+    for i, name in enumerate(foot_names):
+        z_foot = z[:, :, i]
+        contact_foot = contact[:, :, i]
+        if not contact_foot.any() or not (~contact_foot).any():
+            mean_per_foot[name] = 0.0
+            peak_per_foot[name] = 0.0
+            continue
+        stance_z = float(np.median(z_foot[contact_foot]))
+        swing_clearance = z_foot[~contact_foot] - stance_z
+        mean_per_foot[name] = float(np.mean(swing_clearance))
+        peak_per_foot[name] = float(np.percentile(swing_clearance, 95))
+
+    mean_all = float(np.mean(list(mean_per_foot.values()))) if mean_per_foot else 0.0
+    peak_all = float(np.mean(list(peak_per_foot.values()))) if peak_per_foot else 0.0
+    return mean_per_foot, peak_per_foot, mean_all, peak_all
 
 
 def quat_to_euler(quat):
@@ -304,6 +346,11 @@ def compute_results(env, state: dict) -> dict:
     stride_frequency_mean = float(np.mean(list(stride_frequency_per_foot.values()))) if stride_frequency_per_foot else 0.0
     duty_factor_mean = float(np.mean(list(duty_factor_per_foot.values()))) if duty_factor_per_foot else 0.0
 
+    # Despeje de pie: cuanto levanta las patas realmente (no solo cuanto tiempo estan sin contacto)
+    clearance_mean_per_foot, clearance_peak_per_foot, clearance_mean, clearance_peak = compute_foot_clearance(
+        state["foot_z"], state["foot_in_contact"], state["foot_names"] or []
+    )
+
     # Calculate orientation metrics
     orientation_stability = compute_orientation_stability(state["base_quats"]) if state["base_quats"] else 0.0
     orientation_smoothness = (
@@ -334,6 +381,10 @@ def compute_results(env, state: dict) -> dict:
         "stride_frequency_hz_per_foot": stride_frequency_per_foot,
         "duty_factor_mean": duty_factor_mean,
         "duty_factor_per_foot": duty_factor_per_foot,
+        "foot_clearance_mean_m": clearance_mean,
+        "foot_clearance_peak_m": clearance_peak,
+        "foot_clearance_mean_per_foot_m": clearance_mean_per_foot,
+        "foot_clearance_peak_per_foot_m": clearance_peak_per_foot,
         "orientation_stability_0to1": orientation_stability,
         "orientation_smoothness_0to1": orientation_smoothness,
         "velocity_tracking_accuracy_0to1": velocity_tracking,
@@ -425,6 +476,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "foot_names": None,
         "foot_touchdowns": None,
         "foot_contact_steps": None,
+        "foot_z": None,
+        "foot_in_contact": None,
         "impact_force_sum": 0.0,
         "impact_force_sq_sum": 0.0,
         "impact_force_count": 0,

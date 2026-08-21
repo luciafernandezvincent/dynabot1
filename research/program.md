@@ -186,17 +186,44 @@ articular y angular. El gate de locomoción se deja como red de seguridad para c
 futura que induzca el mínimo local de quedarse quieto, aunque no debería activarse con esta
 baseline.
 
-Backlog revisado para las primeras noches (una hipótesis por experimento, cada una apunta a un
-término específico débil, no a "activar" la marcha):
-  1. `dof_acc_l2` -2.5e-7 → -1.0e-6 (4x) — apunta a `movement_smoothness`.
-  2. `dof_torques_l2` -2.5e-5 → -1.0e-4 (4x) — apunta a `impact_force_mean`.
-  3. `action_rate_l2` -0.1 → -0.2 (2x) — apunta a `orientation_smoothness`.
-  4. `feet_air_time` 0.5 → 0.25 — menos altura de zancada, apunta a `impact_force_mean`.
-  5. `undesired_contacts` -1.0 → -3.0 (3x) — apunta a `fall_rate_per_episode` (caídas de hombro).
-  6. `entropy_coef` 0.005 → 0.002 (menos exploración) — explotar la marcha ya buena.
+**El problema principal, medido el 21/08**: el perro **casi no levanta las patas**. Agregada la
+métrica `foot_clearance_*` a `eval.py` (mide la altura del pie en swing relativa a su altura en
+apoyo, no la absoluta, porque el origen del `hand_link` no está en la planta):
+
+| | valor |
+|---|---|
+| despeje medio | **1.9 mm** |
+| despeje pico (p95) | **22.9 mm** |
+| trasera izquierda, medio | **−2.7 mm** (arrastra: en swing está por debajo de su altura de apoyo) |
+| altura de base | 300 mm |
+
+`duty_factor` (0.47) y `stride_frequency` (3.07 Hz) **no detectan esto**, porque solo miran el
+sensor de contacto: un pie que despega 2 mm da los mismos números que uno que despega 5 cm. Por eso
+la marcha parecía sana en la tabla.
+
+Cambios hechos en consecuencia:
+- `mdp/rewards.py`: agregado `foot_clearance_reward` (adaptado de la config de Spot de Isaac Lab),
+  cableado en `velocity_env_cfg.py` con **peso 0** para no alterar la baseline, disponible para
+  tunear vía YAML (`env.rewards.foot_clearance.weight` / `.params.target_height`).
+- `eval.py`: agregadas `foot_clearance_mean_m`, `foot_clearance_peak_m` y sus versiones por pata.
+- `score.py`: agregado el término `foot_clearance` con peso **0.15** (referencia: el pico de la
+  baseline, 22.9 mm). Sin esto, el loop descartaría los experimentos que arreglan el problema,
+  porque cualquier ganancia de despeje con una pérdida mínima en otro término daría "NO MEJORA".
+
+Backlog para las primeras noches (una hipótesis por experimento):
+  1. `foot_clearance` w=0.5, `target_height` 5 cm — activar el término (Spot usa 0.1 con base a
+     0.5 m; 0.05 con base a 0.3 m es la proporción equivalente).
+  2. `foot_clearance` w=1.5, 5 cm — variante agresiva, para ver la dirección del trade-off.
+  3. `foot_clearance` w=1.0, 3 cm — objetivo más modesto por si 5 cm satura el término.
+  4. `foot_clearance` w=1.0 + `feet_air_time` 1.0 — altura y duración juntas: zancada con forma.
+  5. `undesired_contacts` -1.0 → -3.0 — contener las caídas de hombro, que pueden empeorar al
+     pasar más tiempo en apoyo de tres patas.
+  6. `entropy_coef` 0.005 → 0.002 — explotar la marcha ya lograda.
   7. `learning_rate` 1e-3 → 5e-4 — refinar sin los saltos del schedule adaptativo.
-  8. Red más grande: `actor_hidden_dims` [128,128,128] → [512,256,128] (la config "rough" ya la usa)
-     — más capacidad para coordinación fina. Ojo VRAM: en régimen estable la baseline usa ~4.4 GB
-     de 16.3 GB, hay margen.
+  8. Red más grande `[512,256,128]` — más capacidad para coordinación fina. VRAM: la baseline usa
+     ~4.4 GB de 16.3 GB en régimen estable, hay margen.
 
 `research/run_night.py` ya tiene esta cola cargada y lista para correr sin supervisión.
+
+**Al mirar resultados**: un score alto con `foot_clearance_peak_m` bajo significa que el
+experimento mejoró otras cosas sin resolver el problema de fondo. Mirá siempre esa columna.

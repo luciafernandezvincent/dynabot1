@@ -265,6 +265,20 @@ class RewardsCfg:
         weight=-1.0,
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*arm_link"), "threshold": 1.0},
     )
+    # peso 0 por defecto: no cambia el comportamiento de la baseline, solo lo deja disponible
+    # para tunear via YAML (env.rewards.foot_clearance.weight / .params.target_height).
+    # feet_air_time solo premia la DURACION sin contacto, no la altura: un pie puede "levantarse"
+    # unos milimetros y satisfacer igual el umbral de tiempo. Este termino sí mide altura.
+    foot_clearance = RewTerm(
+        func=mdp.foot_clearance_reward,
+        weight=0.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*hand_link"),
+            "target_height": 0.05,
+            "std": 0.05,
+            "tanh_mult": 2.0,
+        },
+    )
     # -- optional penalties
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-1.0e-4)#-1.0e-5)
     dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=0.0)

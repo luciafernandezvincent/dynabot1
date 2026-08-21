@@ -54,13 +54,21 @@ from pathlib import Path
 
 #: Peso de cada termino del score. Suman 1.0.
 WEIGHTS = {
-    "velocity_tracking": 0.40,  # sigue el comando de velocidad (lo mas importante)
-    "orientation_stability": 0.20,  # roll/pitch constantes: no cabecea ni se balancea
-    "orientation_smoothness": 0.15,  # sin rotaciones bruscas del cuerpo
+    "velocity_tracking": 0.35,  # sigue el comando de velocidad (lo mas importante)
+    "foot_clearance": 0.15,  # levanta las patas de verdad (ver nota abajo)
+    "orientation_stability": 0.15,  # roll/pitch constantes: no cabecea ni se balancea
+    "orientation_smoothness": 0.10,  # sin rotaciones bruscas del cuerpo
     "movement_smoothness": 0.10,  # aceleraciones articulares bajas (menos desgaste del servo)
     "impact": 0.10,  # pisadas suaves (protege el hardware real)
     "gait": 0.05,  # marcha en rango de frecuencia / duty factor razonable
 }
+
+# NOTA sobre foot_clearance (agregado 21/08 a pedido del usuario): duty_factor y
+# stride_frequency solo miran el sensor de contacto, asi que un pie que despega 2 mm produce
+# exactamente los mismos numeros que uno que despega 5 cm. Medido en baseline_ar: despeje pico
+# de 22.9 mm y medio de 1.9 mm con la base a 300 mm, y la pata trasera izquierda con despeje
+# medio NEGATIVO (-2.7 mm), o sea arrastrandose. Sin este termino en el score, el loop
+# descartaria los experimentos que arreglan el problema.
 
 # --------------------------------------------------------------------------------------
 # Referencias: valores de la corrida 'baseline_ar' (logs/rsl_rl/anymal_d_flat/baseline_ar,
@@ -74,6 +82,7 @@ REF_ORIENTATION_VARIANCE = 0.001118  # varianza de roll/pitch en rad^2 (menos es
 REF_ANGULAR_ACC = 7.5271  # aceleracion angular media de la base, rad/s^2 (menos es mejor)
 REF_JOINT_ACC = 0.013605  # aceleracion articular media, rad/paso^2 (menos es mejor)
 REF_IMPACT_FORCE = 74.77  # fuerza media de pisada en N (menos es mejor)
+REF_FOOT_CLEARANCE = 0.0229  # despeje pico (percentil 95) en m (mas es mejor)
 
 #: Banda objetivo de frecuencia de zancada por pata, en Hz (ni arrastrar las patas ni vibrar).
 STRIDE_BAND_HZ = (1.5, 3.5)
@@ -199,6 +208,16 @@ def _terms_from_results(results: dict) -> tuple[dict[str, float], dict[str, floa
         terms["impact"] = _lower_is_better(impact, REF_IMPACT_FORCE)
     else:
         missing.append("impact_force_mean")
+
+    # Despeje de pie: se usa el pico (percentil 95) y no la media, porque la media puede ser
+    # negativa cuando el pie se arrastra y no mapea bien a un termino en [0, 1].
+    if "foot_clearance_peak_m" in results:
+        clearance = float(results["foot_clearance_peak_m"])
+        raw["foot_clearance_peak_m"] = clearance
+        raw["foot_clearance_mean_m"] = float(results.get("foot_clearance_mean_m", 0.0))
+        terms["foot_clearance"] = _higher_is_better(clearance, REF_FOOT_CLEARANCE)
+    else:
+        missing.append("foot_clearance_peak_m")
 
     # Marcha: frecuencia de zancada y duty factor dentro de bandas razonables.
     # Ojo: los results.json anteriores a la version actual de eval.py traen 'movement_frequency_hz',

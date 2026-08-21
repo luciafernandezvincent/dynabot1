@@ -1,0 +1,7 @@
+# Hipotesis: una vez que levante las patas (exp_001-004), las 23 caidas de hombro por cada 1000
+# episodios pueden empeorar, porque el robot pasa mas tiempo en apoyo de tres patas. Reforzar
+# undesired_contacts deberia contener eso. Se apila sobre el campeon que traiga el despeje.
+env:
+  rewards:
+    undesired_contacts:
+      weight: -3.0

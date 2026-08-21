@@ -1,0 +1,8 @@
+# Variante mas agresiva de exp_001: si 0.5 mueve la aguja pero poco, con 1.5 deberia verse claro.
+# Si exp_001 ya rompe el tracking, este confirma la direccion del trade-off.
+env:
+  rewards:
+    foot_clearance:
+      weight: 1.5
+      params:
+        target_height: 0.05

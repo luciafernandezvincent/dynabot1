@@ -1,7 +1,0 @@
-# Hipotesis: la marcha ya es buena (3.07 Hz, duty 0.47), asi que no hace falta seguir premiando
-# tanto el tiempo de vuelo. Bajar feet_air_time de 0.5 a 0.25 deberia reducir la altura/fuerza de
-# las zancadas (impact_force_mean = 74.8 N) sin romper la frecuencia de paso ya lograda.
-env:
-  rewards:
-    feet_air_time:
-      weight: 0.25

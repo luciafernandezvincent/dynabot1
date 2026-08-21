@@ -1,0 +1,14 @@
+# PROBLEMA PRINCIPAL (medido 21/08): la baseline casi no levanta las patas. Despeje medio 1.9 mm,
+# pico 22.9 mm, y la trasera izquierda tiene despeje MEDIO NEGATIVO (-2.7 mm): la arrastra.
+# duty_factor (0.47) y stride_frequency (3.07 Hz) no lo detectan porque solo miran el sensor de
+# contacto: un pie que despega 2 mm da los mismos numeros que uno que despega 5 cm.
+#
+# Hipotesis: activar foot_clearance (hoy en peso 0) con altura objetivo de 5 cm deberia forzar
+# el despegue real. Referencia: Spot usa target_height=0.1 con base a 0.5 m (20%); Dyna1 tiene
+# la base a 0.3 m, asi que 0.05 m es la proporcion equivalente.
+env:
+  rewards:
+    foot_clearance:
+      weight: 0.5
+      params:
+        target_height: 0.05

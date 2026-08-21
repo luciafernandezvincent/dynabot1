@@ -205,20 +205,22 @@ def write_results_table() -> None:
         f"Protocolo: `{TASK}`, {TRAIN_ITERATIONS} iters x {TRAIN_NUM_ENVS} envs, seed {SEED}, "
         f"eval {EVAL_NUM_ENVS} envs x {EVAL_NUM_STEPS} pasos.",
         "",
-        "| # | experimento | score | vel_track | ori_estab | ori_suav | mov_suav | impacto N | caidas/ep | zancada Hz | duty | notas |",
-        "|---|-------------|-------|-----------|-----------|----------|----------|-----------|-----------|------------|------|-------|",
+        "| # | experimento | score | despeje mm | vel_track | ori_estab | ori_suav | mov_suav | impacto N | caidas/ep | zancada Hz | duty | notas |",
+        "|---|-------------|-------|------------|-----------|-----------|----------|----------|-----------|-----------|------------|------|-------|",
     ]
     for rank, r in enumerate(done, start=1):
         m = r.get("metrics", {})
         stride = m.get("stride_frequency_hz_mean", m.get("movement_frequency_hz"))
         flag = "" if r.get("valid", True) else " ⚠"
         lines.append(
-            "| {rank} | {name} | {score:.4f}{flag} | {vel:.3f} | {stab:.3f} | {smooth:.3f} | {mov:.3f} | "
+            "| {rank} | {name} | {score:.4f}{flag} | {clearance} | {vel:.3f} | {stab:.3f} | {smooth:.3f} | {mov:.3f} | "
             "{impact:.1f} | {falls:.3f} | {stride} | {duty} | {notes} |".format(
                 rank=rank,
                 name=r["name"],
                 score=r["score"],
                 flag=flag,
+                clearance=(f"{m['foot_clearance_peak_m'] * 1000:.1f}"
+                           if m.get("foot_clearance_peak_m") is not None else "-"),
                 vel=m.get("velocity_tracking_accuracy_0to1", float("nan")),
                 stab=m.get("orientation_stability_0to1", float("nan")),
                 smooth=m.get("orientation_smoothness_0to1", float("nan")),
@@ -262,6 +264,9 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.rescore:
+        # re-fijar el hash del juez ANTES de salir por este camino: si no, un --rescore
+        # --accept-judge-change deja la referencia vieja y todo experimento posterior se planta
+        check_judge_integrity(args.accept_judge_change)
         records = load_records()
         for r in records:
             if r.get("status") == "ok" and "metrics" in r:

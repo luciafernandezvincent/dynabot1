@@ -36,12 +36,12 @@ PYTHON = "/home/linar/miniconda3/envs/env_isaaclab/bin/python"
 # YAML). Se corren en este orden porque exp_001/002/003 atacan el problema mas grave medido
 # (la baseline sigue el comando de velocidad peor que quedarse quieta).
 QUEUE = [
-    ("exp_001_dof_acc_up.yaml", "exp_001_dof_acc_up", "dof_acc_l2 4x mas fuerte, apunta a movement_smoothness"),
-    ("exp_002_torque_up.yaml", "exp_002_torque_up", "dof_torques_l2 4x mas fuerte, apunta a impact_force"),
-    ("exp_003_action_rate_up.yaml", "exp_003_action_rate_up", "action_rate_l2 2x mas fuerte, apunta a orientation_smoothness"),
-    ("exp_004_air_time_down.yaml", "exp_004_air_time_down", "feet_air_time 0.5->0.25, menos altura de zancada -> menos impacto"),
-    ("exp_005_undesired_contacts_up.yaml", "exp_005_undesired_contacts_up", "undesired_contacts 3x mas fuerte, apunta a fall_rate"),
-    ("exp_006_entropy_down.yaml", "exp_006_entropy_down", "menos exploracion, explotar la marcha ya buena"),
+    ("exp_001_clearance_on.yaml", "exp_001_clearance_on", "activar foot_clearance w=0.5 target 5cm"),
+    ("exp_002_clearance_strong.yaml", "exp_002_clearance_strong", "foot_clearance w=1.5 target 5cm"),
+    ("exp_003_clearance_low_target.yaml", "exp_003_clearance_low_target", "foot_clearance w=1.0 target 3cm"),
+    ("exp_004_clearance_plus_airtime.yaml", "exp_004_clearance_plus_airtime", "clearance w=1.0 + feet_air_time 1.0"),
+    ("exp_005_clearance_plus_contacts.yaml", "exp_005_clearance_plus_contacts", "undesired_contacts 3x, contener caidas de hombro"),
+    ("exp_006_entropy_down.yaml", "exp_006_entropy_down", "menos exploracion, explotar la marcha lograda"),
     ("exp_007_lr_down.yaml", "exp_007_lr_down", "learning_rate mas chico, 5e-4, refinar sin saltos"),
     ("exp_008_bigger_net.yaml", "exp_008_bigger_net", "red actor/critic mas grande [512,256,128]"),
 ]

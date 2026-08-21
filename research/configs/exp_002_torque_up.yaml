@@ -1,7 +1,0 @@
-# Hipotesis: dof_torques_l2 = -2.5e-5 penaliza poco el torque. Subirlo 4x deberia reducir picos
-# de torque, lo que suele traducirse en pisadas mas suaves (menor impact_force_mean) y menos
-# caidas de hombro por movimientos bruscos.
-env:
-  rewards:
-    dof_torques_l2:
-      weight: -1.0e-4
