@@ -280,3 +280,20 @@ score lo penaliza todavía; `exp_011` (`air_time_variance`) pasa a ser prioritar
 **Cómo leer esto para el resto de la cola**: el swing se estira por la vía de la ALTURA
 (`foot_clearance.target_height`), no por la vía del tiempo (`feet_air_time`). Un arco más alto
 toma más tiempo por geometría.
+
+
+**Lección 5 — `w=0.5, target=5cm` (el campeón) es un óptimo local afinado, no un punto de
+partida tímido.** Tres intentos distintos de "empujar más fuerte" en cualquier dirección dieron
+MENOS despeje, no más:
+
+| cambio probado | despeje pico | score |
+|---|---|---|
+| campeón (w=0.5, target 5cm) | **40.6 mm** | **0.5837** |
+| `exp_002`: threshold de air_time más bajo | 23.9 mm | 0.4459 |
+| `exp_009`: target 8cm (en vez de 5) | 33.3 mm | 0.5694 |
+| `exp_004`: peso 1.5 (en vez de 0.5) | 28.6 mm | 0.5728 |
+
+En `exp_004`, `orientation_stability` sí mejoró (0.752 vs 0.698 del campeón), a costa de casi
+todo el resto — la política parece priorizar el clearance sobre la coordinación general cuando
+el gradiente empuja más fuerte, y sale peor en conjunto. No insistir con subir peso/target de
+`foot_clearance` sin evidencia nueva; explorar otras vías (gait, contactos, hiperparámetros).
