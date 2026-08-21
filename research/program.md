@@ -297,3 +297,17 @@ En `exp_004`, `orientation_stability` sí mejoró (0.752 vs 0.698 del campeón),
 todo el resto — la política parece priorizar el clearance sobre la coordinación general cuando
 el gradiente empuja más fuerte, y sale peor en conjunto. No insistir con subir peso/target de
 `foot_clearance` sin evidencia nueva; explorar otras vías (gait, contactos, hiperparámetros).
+
+
+**Lección 6 — `GaitReward` sincroniza pero acelera, no da "elegante".** w=5.0 sobre el campeón:
+score 0.5574 (no mejora), zancada 2.56 → **4.84 Hz**, swing 197 → **103 ms**, impacto 50.9 →
+**82.7 N** (peor que la baseline original, 74.8 N). Caídas sí bajaron a casi cero (0.001). El
+término premia que las diagonales tengan el mismo timing, y la forma más fácil de lograr eso es
+una zancada corta y rápida (menos ventana para que se desalinee), no necesariamente un paso lento
+y amplio. Sincronía y "marcha suelta" no son lo mismo — no combinar `gait` con peso alto si el
+objetivo es soltura, capaz sirve con peso bajo solo para prolijidad de timing.
+
+Van 5 experimentos sobre el campeón (`exp_002`, `_004`, `_009`, `_010`, `_011`) y ninguno lo
+superó. El campeón (`foot_clearance` w=0.5, target 5cm, solo) sigue siendo difícil de mejorar por
+esta familia de rewards. Vías no probadas aún: `exp_005` (target más bajo, 3cm, con w=1.0),
+hiperparámetros de PPO, o combinar clearance bajo + air_time_variance bajo (sin gait).
