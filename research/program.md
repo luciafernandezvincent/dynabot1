@@ -333,3 +333,26 @@ como decia el config. El score idéntico a 4 decimales debería haber sido la pr
 **Chequeo para la próxima vez que un experimento no mueva la aguja**: comparar el MD5 del
 checkpoint contra el del campeón. Si son iguales, el override no se aplicó — no es que el cambio
 no importe.
+
+
+## Excepcion puntual: autocolision habilitada (21/08/2026)
+
+El usuario observo en el video del campeon que, caminando hacia atras, la pata casi toca el muslo.
+Causa: `enabled_self_collisions=False` en `dynabot.py` — el simulador no genera fuerza de contacto
+cuando una pata atraviesa el cuerpo, asi que `undesired_contacts` (ya cableado, peso -1.0 sobre
+`.*arm_link`) nunca podia penalizarlo por mas que el pliegue existiera.
+
+Es un parametro de fisica/colision, fuera del espacio de configuracion permitido — se le pregunto
+al usuario explicitamente y autorizo esta UNICA excepcion, razonando que a diferencia de masa,
+actuadores o delay, la autocolision no cambia la dinamica del robot real (el cuerpo real siempre
+choca consigo mismo; lo que fallaba era que el simulador no lo veia). Cambio hecho en
+`dynabot.py`, documentado inline, en `DYNABOT_1_CFG` y `DYNABOT_1_WITH_DELAY_CFG`.
+
+**Esto es un cambio de regimen, no un experimento mas.** A partir de `exp_013_self_collision`, los
+scores no son directamente comparables contra `baseline_ar`/`exp_001`-`012` (todos entrenados con
+autocolision apagada). Riesgo conocido: puede aparecer contacto nuevo en gestos que antes pasaban
+gratis (base, hombro contra el propio cuerpo), asi que es esperable ver mas caidas de lo usual
+mientras la politica aprende a evitar el contacto real que antes no existia.
+
+No volver a tocar ningun otro parametro de fisica sin pedirlo explicitamente: esta excepcion es
+puntual, no un precedente general.

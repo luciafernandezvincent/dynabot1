@@ -65,7 +65,14 @@ DYNABOT_1_CFG = ArticulationCfg(
             max_depenetration_velocity=1.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=False, solver_position_iteration_count=4, solver_velocity_iteration_count=0
+            # EXCEPCION PUNTUAL autorizada por el usuario el 21/08/2026: es el unico parametro de
+            # fisica/colision que se toca en esta investigacion. A diferencia de masa/actuadores/
+            # delay, la autocolision no cambia la dinamica del robot REAL (el cuerpo real siempre
+            # choca consigo mismo; lo que cambiaba era que el SIMULADOR no lo detectaba). Motivo:
+            # con self-collision=False, la pata podia atravesar el muslo en marcha hacia atras sin
+            # que ningun sensor de contacto lo registrara, asi que undesired_contacts (ya cableado,
+            # peso -1.0, apunta a .*arm_link) nunca podia penalizarlo.
+            enabled_self_collisions=True, solver_position_iteration_count=4, solver_velocity_iteration_count=0
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
@@ -145,7 +152,14 @@ DYNABOT_1_WITH_DELAY_CFG = ArticulationCfg(
             max_depenetration_velocity=1.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=False, solver_position_iteration_count=4, solver_velocity_iteration_count=0
+            # EXCEPCION PUNTUAL autorizada por el usuario el 21/08/2026: es el unico parametro de
+            # fisica/colision que se toca en esta investigacion. A diferencia de masa/actuadores/
+            # delay, la autocolision no cambia la dinamica del robot REAL (el cuerpo real siempre
+            # choca consigo mismo; lo que cambiaba era que el SIMULADOR no lo detectaba). Motivo:
+            # con self-collision=False, la pata podia atravesar el muslo en marcha hacia atras sin
+            # que ningun sensor de contacto lo registrara, asi que undesired_contacts (ya cableado,
+            # peso -1.0, apunta a .*arm_link) nunca podia penalizarlo.
+            enabled_self_collisions=True, solver_position_iteration_count=4, solver_velocity_iteration_count=0
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
