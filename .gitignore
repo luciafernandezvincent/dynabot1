@@ -73,3 +73,10 @@ tests/
 # TacSL sensor
 **/tactile_record/*
 **/gelsight_r15_data/*
+
+# autoresearch: logs de corridas (los resultados van en research/results.jsonl y RESULTS.md)
+research/runs/
+research/__pycache__/
+
+# clon de referencia de karpathy/autoresearch (tiene su propio .git)
+autoresearch/
