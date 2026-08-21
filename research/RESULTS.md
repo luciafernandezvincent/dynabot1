@@ -13,14 +13,6 @@ Protocolo: `Dyna1-Flat-v0`, 1500 iters x 4096 envs, seed 42, eval 1000 envs x 10
 | 5 | exp_010_trot_gait | 0.5574 | 38.6 | 0.965 | 0.997 | 0.109 | 0.980 | 82.7 | 0.001 | 4.84 | 0.50 | GaitReward w=5.0, sincronizar diagonales (trote real). Cambio de via tras 3 intentos fallidos de empujar clearance mas fuerte |
 | 6 | baseline_ar | 0.4790 | 22.9 | 0.972 | 0.989 | 0.117 | 0.987 | 74.8 | 0.023 | 3.07 | 0.47 | baseline de referencia, defaults del codigo |
 | 7 | exp_002_airtime_threshold_fix | 0.4459 | 23.9 | 0.971 | 0.988 | 0.108 | 0.986 | 65.4 | 0.036 | 3.96 | 0.50 | CAUSA RAIZ: threshold 0.5->0.12s aislado vs baseline (sin clearance) |
-
-## Experimentos fallidos
-
-- `exp_008_bigger_net` (2026-08-21T20:17:17): eval_failed -   )
-)
-Error executing job with overrides: []
-Traceback (most recent call last):
-  File "/home/linar/IsaacLab/source/isaaclab_tasks/isaaclab_tasks/utils/hydra.py", line 100, in hydra_main
-    func(env_
+| 8 | exp_008_bigger_net | -2.0000 ⚠ | 0.0 | 0.257 | 1.000 | 0.000 | 1.000 | 0.0 | 1.000 | 0.00 | 0.00 | 3er intento: pipeline corregido (eval.py/play.py reciben --experiment_config), no cambia la logica de metricas |
 
 ⚠ = viola una restriccion dura de `research/score.py` (no compite por el mejor).

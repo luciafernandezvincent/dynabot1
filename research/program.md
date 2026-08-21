@@ -402,3 +402,37 @@ numero que en realidad era de la red chica.
 cambia arquitectura de red, comparar el MD5 del checkpoint contra el campeon antes de confiar en
 el numero. Si un experimento se corre dos veces con el mismo nombre, mirar `research/RESULTS.md`
 la seccion de fallidos ademas de la tabla principal.
+
+
+## Autocolision revertida: bloqueaba TODO entrenamiento (21/08/2026)
+
+`exp_008` (red grande) dio un resultado catastrofico: `fall_rate=1.0`, `base_falls` EXACTAMENTE
+igual a `episodes_completed` (1,000,000), `shoulder_falls=0`, `stride_frequency=0`, y
+`Mean episode length: 1.00` **desde la primera linea del log de entrenamiento**, no como algo que
+se degrada con el tiempo. Eso descarta que sea un problema de la red grande: es geometrico, pasa
+en el paso 0, para el 100% de los envs, independiente de que politica corra.
+
+Causa: la autocolision (habilitada un rato antes, ver seccion anterior) probablemente hace que la
+pose de reposo por defecto (`shoulder_to_arm=-0.79`, `arm_to_hand=1.5`, plegada) se auto-toque
+contra `base_link`. Esa pose nunca se habia validado contra autocolision porque siempre estuvo
+apagada. Con self-collision=True, ese contacto se registra como `base_contact` (termination) en
+el instante del reset, para todos los robots, siempre.
+
+**Revertido a `enabled_self_collisions=False`.** Bloqueaba cualquier entrenamiento, no solo el de
+`exp_008` que estaba corriendo en ese momento — de no revertirlo, `exp_013` (que iba a probar
+exactamente esto de forma aislada) hubiera dado el mismo resultado catastrofico, y cualquier otra
+cosa que se intentara despues tambien.
+
+**exp_008 queda sin dato valido sobre la red grande**: su fracaso midio el efecto de la
+autocolision sobre la pose de reposo, no el de la arquitectura. Hay que relanzarlo (4ta vez) con
+autocolision apagada para tener una medicion real.
+
+**El pliegue de pata en marcha hacia atras vuelve al espacio de reward shaping**: `dof_pos_limits`
+(ya cableado, peso 0) penaliza que las juntas se acerquen a sus limites blandos. No detecta
+contacto fisico como hubiera hecho `undesired_contacts` con autocolision, pero desalienta la
+flexion extrema sin tocar fisica ni colision. `exp_014_dof_pos_limits.yaml`, peso -1.0.
+
+**Leccion para la proxima vez que se toque algo fisico/geometrico**: antes de lanzar un
+entrenamiento largo sobre un cambio de esta naturaleza, correr un diagnostico corto (unas pocas
+iteraciones) para ver si sobrevive el primer reset. Hubiera costado 2 minutos en vez de un
+entrenamiento completo mal atribuido.

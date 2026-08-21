@@ -1,0 +1,10 @@
+# Via alternativa para el pliegue de pata en marcha hacia atras, tras revertir la autocolision
+# (que bloqueaba TODO entrenamiento por auto-toque de la pose de reposo contra base_link).
+#
+# dof_pos_limits ya esta cableado (peso 0 en velocity_env_cfg.py) y penaliza cuando una junta se
+# acerca a sus limites blandos. No detecta contacto fisico como undesired_contacts, pero
+# desalienta la flexion extrema que produce el pliegue visible, sin tocar fisica ni colision.
+env:
+  rewards:
+    dof_pos_limits:
+      weight: -1.0

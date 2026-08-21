@@ -65,14 +65,16 @@ DYNABOT_1_CFG = ArticulationCfg(
             max_depenetration_velocity=1.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            # EXCEPCION PUNTUAL autorizada por el usuario el 21/08/2026: es el unico parametro de
-            # fisica/colision que se toca en esta investigacion. A diferencia de masa/actuadores/
-            # delay, la autocolision no cambia la dinamica del robot REAL (el cuerpo real siempre
-            # choca consigo mismo; lo que cambiaba era que el SIMULADOR no lo detectaba). Motivo:
-            # con self-collision=False, la pata podia atravesar el muslo en marcha hacia atras sin
-            # que ningun sensor de contacto lo registrara, asi que undesired_contacts (ya cableado,
-            # peso -1.0, apunta a .*arm_link) nunca podia penalizarlo.
-            enabled_self_collisions=True, solver_position_iteration_count=4, solver_velocity_iteration_count=0
+            # Se probo enabled_self_collisions=True el 21/08/2026 (excepcion autorizada por el
+            # usuario) para que undesired_contacts detecte el pliegue de pata contra el muslo en
+            # marcha hacia atras. Revertido: la pose de reposo por defecto (shoulder_to_arm=-0.79,
+            # arm_to_hand=1.5) nunca se valido contra autocolision y aparentemente se auto-toca
+            # contra base_link, terminando el 100% de los episodios en el paso 0 (base_falls
+            # exactamente igual a episodes_completed, shoulder_falls=0, Mean episode length=1.00
+            # desde la primera iteracion). Bloqueaba cualquier entrenamiento, no solo el de la red
+            # grande que estaba corriendo en ese momento. El pliegue de pata se ataca via reward
+            # shaping (dof_pos_limits) en vez de por esta via.
+            enabled_self_collisions=False, solver_position_iteration_count=4, solver_velocity_iteration_count=0
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
@@ -152,14 +154,16 @@ DYNABOT_1_WITH_DELAY_CFG = ArticulationCfg(
             max_depenetration_velocity=1.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            # EXCEPCION PUNTUAL autorizada por el usuario el 21/08/2026: es el unico parametro de
-            # fisica/colision que se toca en esta investigacion. A diferencia de masa/actuadores/
-            # delay, la autocolision no cambia la dinamica del robot REAL (el cuerpo real siempre
-            # choca consigo mismo; lo que cambiaba era que el SIMULADOR no lo detectaba). Motivo:
-            # con self-collision=False, la pata podia atravesar el muslo en marcha hacia atras sin
-            # que ningun sensor de contacto lo registrara, asi que undesired_contacts (ya cableado,
-            # peso -1.0, apunta a .*arm_link) nunca podia penalizarlo.
-            enabled_self_collisions=True, solver_position_iteration_count=4, solver_velocity_iteration_count=0
+            # Se probo enabled_self_collisions=True el 21/08/2026 (excepcion autorizada por el
+            # usuario) para que undesired_contacts detecte el pliegue de pata contra el muslo en
+            # marcha hacia atras. Revertido: la pose de reposo por defecto (shoulder_to_arm=-0.79,
+            # arm_to_hand=1.5) nunca se valido contra autocolision y aparentemente se auto-toca
+            # contra base_link, terminando el 100% de los episodios en el paso 0 (base_falls
+            # exactamente igual a episodes_completed, shoulder_falls=0, Mean episode length=1.00
+            # desde la primera iteracion). Bloqueaba cualquier entrenamiento, no solo el de la red
+            # grande que estaba corriendo en ese momento. El pliegue de pata se ataca via reward
+            # shaping (dof_pos_limits) en vez de por esta via.
+            enabled_self_collisions=False, solver_position_iteration_count=4, solver_velocity_iteration_count=0
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
