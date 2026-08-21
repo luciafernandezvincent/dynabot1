@@ -182,15 +182,24 @@ def append_record(record: dict) -> None:
 
 
 def load_records() -> list[dict]:
+    """Lee results.jsonl y deja solo el ULTIMO registro por nombre de experimento.
+
+    Un mismo --name puede correrse mas de una vez (por ejemplo, corregir un bug y relanzar). El
+    intento mas nuevo es la verdad: si el primero "ok" pero estaba mal (ver exp_008_bigger_net,
+    21/08/2026, entreno la red chica por un campo deprecado y quedo marcado ok igual) y el
+    relanzamiento corrige o incluso falla, el resultado vigente tiene que ser el ultimo, no el
+    primero que aparezca.
+    """
     if not RESULTS_JSONL.exists():
         return []
-    records = []
+    by_name = {}
     with open(RESULTS_JSONL) as f:
         for line in f:
             line = line.strip()
             if line:
-                records.append(json.loads(line))
-    return records
+                record = json.loads(line)
+                by_name[record["name"]] = record  # el ultimo con este nombre gana
+    return list(by_name.values())
 
 
 def write_results_table() -> None:
@@ -246,7 +255,9 @@ def write_results_table() -> None:
     print(f"[INFO] Tabla actualizada: {RESULTS_MD}")
 
 
-def record_video(name: str, run_dir: Path, log_dir: Path, seed: int) -> tuple[str | None, float, str | None]:
+def record_video(
+    name: str, run_dir: Path, log_dir: Path, seed: int, experiment_config: Path | None = None
+) -> tuple[str | None, float, str | None]:
     """Graba un video de la marcha con VIDEO_NUM_ENVS perros y lo deja en el dir del experimento.
 
     Corre despues del eval y antes de devolver el control, para que una cola secuencial nunca
@@ -263,6 +274,8 @@ def record_video(name: str, run_dir: Path, log_dir: Path, seed: int) -> tuple[st
         f"--num_envs={VIDEO_NUM_ENVS}",
         f"--seed={seed}",
     ]
+    if experiment_config is not None:
+        video_cmd.append(f"--experiment_config={experiment_config}")
     started = time.time()
     run_dir.mkdir(parents=True, exist_ok=True)
     returncode, tail = run_command(video_cmd, run_dir / "video.log", VIDEO_TIMEOUT_S)
@@ -315,7 +328,9 @@ def main() -> int:
         if not log_dir.exists():
             print(f"[ERROR] No existe la corrida {log_dir}", file=sys.stderr)
             return 1
-        path, _, error = record_video(args.name, RUNS_DIR / args.name, log_dir, args.seed)
+        existing_resolved = RUNS_DIR / args.name / "config.resolved.yaml"
+        experiment_config = existing_resolved if existing_resolved.exists() else None
+        path, _, error = record_video(args.name, RUNS_DIR / args.name, log_dir, args.seed, experiment_config)
         return 0 if path else 1
 
     if args.rescore:
@@ -399,6 +414,7 @@ def main() -> int:
         f"--num_envs={EVAL_NUM_ENVS}",
         f"--num_steps={EVAL_NUM_STEPS}",
         f"--seed={args.seed}",
+        f"--experiment_config={resolved_path}",
     ]
 
     if args.dry_run:
@@ -444,7 +460,7 @@ def main() -> int:
     record["eval_seconds"] = round(time.time() - eval_started, 1)
 
     if not args.no_video:
-        video_path, video_seconds, video_error = record_video(name, run_dir, log_dir, args.seed)
+        video_path, video_seconds, video_error = record_video(name, run_dir, log_dir, args.seed, resolved_path)
         record["video_seconds"] = video_seconds
         if video_path:
             record["video_path"] = video_path

@@ -356,3 +356,49 @@ mientras la politica aprende a evitar el contacto real que antes no existia.
 
 No volver a tocar ningun otro parametro de fisica sin pedirlo explicitamente: esta excepcion es
 puntual, no un precedente general.
+
+
+## Bug encontrado: eval.py y play.py no aplicaban el YAML del experimento (21/08/2026)
+
+Tras corregir el campo `agent.policy.*` (arriba), `exp_008` volvio a fallar: el checkpoint SI se
+entreno con la red grande (MD5 distinto, confirmado), pero `eval.py` crasheaba al cargarlo:
+
+```
+RuntimeError: Error(s) in loading state_dict for MLPModel:
+	size mismatch for mlp.0.weight: copying a param with shape torch.Size([512, 48]) from
+	checkpoint, the shape in current model is torch.Size([128, 48]).
+```
+
+**Causa raiz**: `apply_experiment_config` (que aplica el YAML del experimento) solo estaba
+cableado en `train_delay.py`. `eval.py` y `play.py` reconstruyen `agent_cfg` desde el default de
+la tarea (`AnymalDFlatPPORunnerCfg`, red `[128,128,128]`) y JAMAS leen el YAML — no tienen forma
+de saber que el checkpoint que estan por cargar tiene otra arquitectura.
+
+**Por que no lo detectamos antes**: para experimentos de pesos de reward e hiperparametros de PPO
+(`exp_001`-`_011`), esto es inofensivo — esos campos no cambian la FORMA del checkpoint, asi que
+`eval.py`/`play.py` cargan igual aunque no reciban el YAML. Solo explota con cambios de
+arquitectura (`actor`/`critic.hidden_dims`).
+
+**Como se coló un resultado falso en la tabla**: el primer intento roto de `exp_008` (campo
+deprecado, entreno la red chica sin darse cuenta) tuvo un eval "exitoso" -porque cargaba una red
+chica en un checkpoint chico, todo consistente, aunque por la razon equivocada- y quedo con
+`status: ok, score: 0.5837` en `results.jsonl`. El SEGUNDO intento (red grande de verdad) fallo en
+eval, pero `write_results_table` no descartaba entradas viejas con el mismo nombre: la tabla
+seguia mostrando el primer resultado como si fuera valido, dandole credito a la red grande por un
+numero que en realidad era de la red chica.
+
+**Arreglado**:
+- `scripts/rsl_rl/experiment_config.py`: modulo nuevo, `apply_overrides`/`apply_experiment_config`
+  sacados de `train_delay.py` para poder compartirlos.
+- `eval.py` y `play.py`: agregado `--experiment_config`, aplicado en el mismo punto del flujo que
+  `train_delay.py` (despues de `handle_deprecated_rsl_rl_cfg`).
+- `run_experiment.py`: pasa `--experiment_config={resolved_path}` tambien a `eval_cmd` y al
+  `video_cmd` (incluso en `--video-only`, buscando el `config.resolved.yaml` del propio run).
+- `load_records()` (en `run_experiment.py` Y en `run_night.py`, tenian copias separadas): ahora
+  deja solo el ULTIMO registro por nombre. Un `--name` relanzado reemplaza al intento anterior en
+  la tabla en vez de convivir con el.
+
+**Chequeo para la proxima vez que algo no se explica**: si un experimento "no mueve la aguja" y
+cambia arquitectura de red, comparar el MD5 del checkpoint contra el campeon antes de confiar en
+el numero. Si un experimento se corre dos veces con el mismo nombre, mirar `research/RESULTS.md`
+la seccion de fallidos ademas de la tabla principal.

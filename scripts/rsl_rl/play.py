@@ -14,6 +14,7 @@ from isaaclab.app import AppLauncher
 
 # local imports
 import cli_args  # isort: skip
+from experiment_config import apply_experiment_config  # isort: skip
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
@@ -34,6 +35,14 @@ parser.add_argument(
     help="Use the pre-trained checkpoint from Nucleus.",
 )
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
+parser.add_argument(
+    "--experiment_config", type=str, default=None,
+    help=(
+        "Path to the SAME YAML used to train the checkpoint being played. Necesario cuando el "
+        "experimento cambia la ARQUITECTURA del modelo (agent.actor/critic.hidden_dims): sin esto "
+        "play.py reconstruye la red con la forma default de la tarea y falla al cargar el checkpoint."
+    ),
+)
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -107,6 +116,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # handle deprecated configurations
     agent_cfg = handle_deprecated_rsl_rl_cfg(agent_cfg, installed_version)
+
+    # apply the SAME env/agent overrides used to train this checkpoint, if given
+    if args_cli.experiment_config is not None:
+        apply_experiment_config(env_cfg, agent_cfg, args_cli.experiment_config)
 
     # set the environment seed
     # note: certain randomizations occur in the environment initialization so we set the seed here

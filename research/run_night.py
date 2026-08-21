@@ -61,9 +61,17 @@ def wait_for_gpu_free(poll_s: int = 30) -> None:
 
 
 def load_records() -> list[dict]:
+    """Deja solo el ULTIMO registro por nombre: un --name relanzado (bug corregido) reemplaza
+    al intento anterior en vez de convivir con el en el historial."""
     if not RESULTS_JSONL.exists():
         return []
-    return [json.loads(line) for line in RESULTS_JSONL.read_text().splitlines() if line.strip()]
+    by_name = {}
+    for line in RESULTS_JSONL.read_text().splitlines():
+        line = line.strip()
+        if line:
+            record = json.loads(line)
+            by_name[record["name"]] = record
+    return list(by_name.values())
 
 
 def best_valid_score() -> float | None:

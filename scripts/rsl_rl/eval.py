@@ -14,6 +14,7 @@ from isaaclab.app import AppLauncher
 
 # local imports
 import cli_args  # isort: skip
+from experiment_config import apply_experiment_config  # isort: skip
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Evaluate an RL agent with RSL-RL.")
@@ -30,6 +31,14 @@ parser.add_argument(
 )
 parser.add_argument("--action-delay", type=int, default=1, help="Number of steps to delay actions (1 = no delay)")
 parser.add_argument("--num_steps", type=int, default=1000, help="Number of simulation steps to run the evaluation for.")
+parser.add_argument(
+    "--experiment_config", type=str, default=None,
+    help=(
+        "Path to the SAME YAML used to train the checkpoint being evaluated. Necesario cuando el "
+        "experimento cambia la ARQUITECTURA del modelo (agent.actor/critic.hidden_dims): sin esto "
+        "eval.py reconstruye la red con la forma default de la tarea y falla al cargar el checkpoint."
+    ),
+)
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -412,6 +421,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # handle deprecated configurations
     agent_cfg = handle_deprecated_rsl_rl_cfg(agent_cfg, installed_version)
+
+    # apply the SAME env/agent overrides used to train this checkpoint, if given
+    if args_cli.experiment_config is not None:
+        apply_experiment_config(env_cfg, agent_cfg, args_cli.experiment_config)
 
     # set the environment seed
     # note: certain randomizations occur in the environment initialization so we set the seed here
