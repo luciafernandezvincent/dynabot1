@@ -1,0 +1,17 @@
+# La combinacion completa de lo que deberia dar una caminata elegante, si las tres hipotesis
+# aisladas (exp_009 swing largo, exp_010 trote, exp_011 simetria) resultan positivas por
+# separado. Se corre al final para poder atribuir cada efecto.
+env:
+  rewards:
+    feet_air_time:
+      weight: 2.0
+      params:
+        threshold: 0.12
+    foot_clearance:
+      weight: 1.0
+      params:
+        target_height: 0.05
+    gait:
+      weight: 5.0
+    air_time_variance:
+      weight: -1.0

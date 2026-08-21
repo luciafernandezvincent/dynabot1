@@ -1,0 +1,10 @@
+# OBJETIVO: marcha elegante = patron de trote real, no cuatro patas por su cuenta.
+#
+# GaitReward (de la config de Spot) sincroniza las diagonales: delantera izq + trasera der pisan
+# juntas, mientras el otro par vuela. Es lo que convierte un movimiento de patas en una marcha
+# con forma. Spot lo usa con weight=10.0; se arranca en 5.0 por ser un termino multiplicativo
+# fuerte, sobre el campeon que ya tiene despeje.
+env:
+  rewards:
+    gait:
+      weight: 5.0

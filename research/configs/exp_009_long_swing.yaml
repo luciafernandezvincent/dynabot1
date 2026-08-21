@@ -1,0 +1,19 @@
+# OBJETIVO: swing mas largo. Hoy el swing dura 173 ms (baseline) / 197 ms (exp_001).
+#
+# Mecanica: reward = (last_air_time - threshold) * first_contact, pagado en cada aterrizaje.
+# La tasa por segundo es f * ((1-D)/f - thr) = (1-D) - thr*f. Con thr > 0 la tasa BAJA con la
+# frecuencia, o sea el termino paga por pasos menos frecuentes y mas largos... pero solo si thr
+# esta por debajo del swing real, que no es el caso hoy (thr=0.5 s vs swing de 0.17 s).
+#
+# Hipotesis: thr = 0.12 s (debajo del swing real, invierte el signo) MAS peso 2.0 (4x) para que
+# el termino tenga fuerza real frente al resto. Deberia estirar el swing y bajar la frecuencia.
+env:
+  rewards:
+    feet_air_time:
+      weight: 2.0
+      params:
+        threshold: 0.12
+    foot_clearance:
+      weight: 0.5
+      params:
+        target_height: 0.05

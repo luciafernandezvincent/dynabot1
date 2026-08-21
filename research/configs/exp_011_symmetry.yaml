@@ -1,0 +1,9 @@
+# OBJETIVO: corregir la asimetria medida en exp_001, donde la delantera izquierda despegaba
+# 71 mm y la trasera derecha 19 mm (casi 4x). Ninguna metrica ni reward penalizaba esa
+# diferencia, asi que la politica no tenia motivo para repartir el trabajo.
+#
+# air_time_variance_penalty castiga la varianza de tiempo de aire/contacto entre patas.
+env:
+  rewards:
+    air_time_variance:
+      weight: -1.0

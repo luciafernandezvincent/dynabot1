@@ -269,6 +269,32 @@ class RewardsCfg:
     # para tunear via YAML (env.rewards.foot_clearance.weight / .params.target_height).
     # feet_air_time solo premia la DURACION sin contacto, no la altura: un pie puede "levantarse"
     # unos milimetros y satisfacer igual el umbral de tiempo. Este termino sí mide altura.
+    # tambien en peso 0: disponibles para tunear via YAML sin alterar la baseline.
+    # gait fuerza el patron de trote (diagonales sincronizadas); air_time_variance castiga que
+    # unas patas trabajen mas que otras (en exp_001 la delantera izq despegaba 4x mas que la
+    # trasera der). Ambos adaptados de la config de Spot de Isaac Lab.
+    gait = RewTerm(
+        func=mdp.GaitReward,
+        weight=0.0,
+        params={
+            "std": 0.1,
+            "max_err": 0.2,
+            "velocity_threshold": 0.5,
+            "synced_feet_pair_names": (
+                ("front_left_hand_link", "back_right_hand_link"),
+                ("front_right_hand_link", "back_left_hand_link"),
+            ),
+            "asset_cfg": SceneEntityCfg("robot"),
+            "sensor_cfg": SceneEntityCfg("contact_forces"),
+        },
+    )
+
+    air_time_variance = RewTerm(
+        func=mdp.air_time_variance_penalty,
+        weight=0.0,
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*hand_link")},
+    )
+
     foot_clearance = RewTerm(
         func=mdp.foot_clearance_reward,
         weight=0.0,
