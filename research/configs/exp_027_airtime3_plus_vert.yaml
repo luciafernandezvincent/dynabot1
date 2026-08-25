@@ -1,0 +1,11 @@
+# Combina los dos mejores de la tanda anterior: el air_time 3.0 de exp_022 (paso 28.2cm, el mas
+# amplio) con la libertad vertical de exp_023 (lin_vel_z_l2 -0.5, que dio el mejor despeje 38.1mm).
+# La apuesta es paso amplio Y arco alto a la vez.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -1.0
+    feet_air_time:
+      weight: 3.0
+    lin_vel_z_l2:
+      weight: -0.5

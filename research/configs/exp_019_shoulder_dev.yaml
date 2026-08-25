@@ -1,0 +1,11 @@
+# Penalizacion quirurgica: joint_deviation SOLO en las juntas de hombro (base_to_*_shoulder), que
+# definen si el codo va plegado hacia adentro. shoulder_to_arm y arm_to_hand quedan libres para
+# hacer el arco del paso.
+#
+# Motivo: exp_016/017 penalizaron TODAS las juntas y enderezaron la postura pero achicaron el paso
+# (despeje 40.6 -> 10.3 mm, swing 197 -> 134 ms, zancada 2.56 -> 4.54 Hz). El objetivo es postura
+# recta SIN perder amplitud. Peso -0.5, el mismo de exp_017, para comparar directo.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -0.5

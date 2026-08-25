@@ -1,0 +1,11 @@
+# Paso mas amplio via acciones mas libres: action_rate_l2 (-0.1) penaliza cambiar de accion entre
+# pasos, lo que empuja a movimientos chicos y conservadores. Aflojarlo a -0.03 deberia permitir
+# excursiones articulares mas grandes = zancada mas amplia.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -1.0
+    feet_air_time:
+      weight: 1.5
+    action_rate_l2:
+      weight: -0.03

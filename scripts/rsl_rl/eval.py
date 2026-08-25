@@ -124,6 +124,19 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
     state["foot_z"].append(foot_z)
     state["foot_in_contact"].append(in_contact.detach().cpu().numpy())
 
+    # contacto de codo (arm_link) contra el piso: no hay terminacion dura para esto (a diferencia
+    # de base_link/shoulder_link), solo la penalizacion blanda de undesired_contacts. Se mide
+    # aparte para saber si el robot "camina con los codos".
+    if state["arm_ids"] is None:
+        state["arm_ids"], state["arm_names"] = contact_sensor.find_bodies(".*arm_link")
+    arm_in_contact = contact_sensor.data.current_contact_time[:, state["arm_ids"]] > 0.0
+    state["arm_contact_steps"] += arm_in_contact.sum().item()
+    arm_forces = torch.norm(contact_sensor.data.net_forces_w[:, state["arm_ids"], :], dim=-1)
+    arm_force_in_contact = arm_forces[arm_in_contact]
+    if arm_force_in_contact.numel() > 0:
+        state["arm_contact_force_sum"] += arm_force_in_contact.sum().item()
+        state["arm_contact_force_max"] = max(state["arm_contact_force_max"], arm_force_in_contact.max().item())
+
     foot_forces = torch.norm(contact_sensor.data.net_forces_w[:, state["foot_ids"], :], dim=-1)
     impact_forces = foot_forces[first_contact]
     if impact_forces.numel() > 0:
@@ -134,6 +147,16 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
 
     # Record joint positions for smoothness analysis
     articulation = env.unwrapped.scene.articulations["robot"]
+    # desviacion respecto de la pose default: cuanto "flexionado" camina. En el robot real los
+    # actuadores hacen mejor fuerza cerca de la default, asi que menos es mejor.
+    default_joint_pos = articulation.data.default_joint_pos
+    deviation = torch.abs(articulation.data.joint_pos - default_joint_pos)
+    if state["joint_names"] is None:
+        state["joint_names"] = articulation.data.joint_names
+    state["joint_dev_sum"] += deviation.mean().item()
+    state["joint_dev_per_joint_sum"] += deviation.mean(dim=0).detach().cpu().numpy()
+    state["joint_dev_steps"] += 1
+
     joint_pos = articulation.data.joint_pos.detach().cpu().numpy()  # Shape: (num_envs, num_joints)
     if state["joint_positions"] is None:
         state["joint_positions"] = []
@@ -168,6 +191,9 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
             state["actual_vels"] = []
         state["cmd_vels"].append(cmd_vel)
         state["actual_vels"].append(actual_vel)
+        # rapidez horizontal real, para derivar el largo de paso (velocidad / frecuencia)
+        state["speed_sum"] += float(np.linalg.norm(actual_lin_vel_b, axis=-1).mean())
+        state["speed_steps"] += 1
 
 
 def compute_movement_smoothness(joint_positions):
@@ -390,6 +416,29 @@ def compute_results(env, state: dict) -> dict:
         "stride_frequency_hz_per_foot": stride_frequency_per_foot,
         "duty_factor_mean": duty_factor_mean,
         "duty_factor_per_foot": duty_factor_per_foot,
+        "mean_speed_mps": (state["speed_sum"] / state["speed_steps"] if state["speed_steps"] > 0 else 0.0),
+        # largo de paso = cuanto avanza el cuerpo por cada zancada de una pata. Es lo que se
+        # percibe como paso "amplio" o "cortito", y no lo capturan ni el despeje (altura) ni el
+        # swing (duracion) por separado.
+        "step_length_m": (
+            (state["speed_sum"] / state["speed_steps"]) / stride_frequency_mean
+            if state["speed_steps"] > 0 and stride_frequency_mean > 0 else 0.0
+        ),
+        "joint_deviation_mean_rad": (
+            state["joint_dev_sum"] / state["joint_dev_steps"] if state["joint_dev_steps"] > 0 else 0.0
+        ),
+        "joint_deviation_per_joint_rad": (
+            {n: float(v) for n, v in zip(state["joint_names"], state["joint_dev_per_joint_sum"] / state["joint_dev_steps"])}
+            if state["joint_dev_steps"] > 0 and state["joint_names"] else {}
+        ),
+        "elbow_contact_rate": (
+            state["arm_contact_steps"] / (env.unwrapped.num_envs * args_cli.num_steps * max(1, len(state["arm_names"] or [])))
+            if state["arm_names"] else 0.0
+        ),
+        "elbow_contact_force_mean": (
+            state["arm_contact_force_sum"] / state["arm_contact_steps"] if state["arm_contact_steps"] > 0 else 0.0
+        ),
+        "elbow_contact_force_max": state["arm_contact_force_max"],
         "foot_clearance_mean_m": clearance_mean,
         "foot_clearance_peak_m": clearance_peak,
         "foot_clearance_mean_per_foot_m": clearance_mean_per_foot,
@@ -491,6 +540,17 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "foot_contact_steps": None,
         "foot_z": None,
         "foot_in_contact": None,
+        "arm_ids": None,
+        "arm_names": None,
+        "arm_contact_steps": 0,
+        "arm_contact_force_sum": 0.0,
+        "arm_contact_force_max": 0.0,
+        "joint_names": None,
+        "joint_dev_sum": 0.0,
+        "joint_dev_per_joint_sum": 0.0,
+        "joint_dev_steps": 0,
+        "speed_sum": 0.0,
+        "speed_steps": 0,
         "impact_force_sum": 0.0,
         "impact_force_sq_sum": 0.0,
         "impact_force_count": 0,

@@ -1,0 +1,13 @@
+# Paso mas amplio via mas altura: foot_clearance con objetivo 7cm y peso 1.0, sobre la base de
+# exp_021. exp_009 mostro que 8cm satura, pero eso fue SIN el air_time alto que ahora estira el
+# vuelo: con mas tiempo en el aire, un objetivo mas alto puede volverse alcanzable.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -1.0
+    feet_air_time:
+      weight: 1.5
+    foot_clearance:
+      weight: 1.0
+      params:
+        target_height: 0.07

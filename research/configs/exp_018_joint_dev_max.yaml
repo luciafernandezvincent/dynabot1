@@ -1,0 +1,6 @@
+# Version extrema: w=-1.0. Riesgo real de que domine sobre el tracking de velocidad y el robot
+# camine rigido o directamente deje de avanzar. Correr solo si exp_017 sigue sin alcanzar.
+env:
+  rewards:
+    joint_deviation:
+      weight: -1.0

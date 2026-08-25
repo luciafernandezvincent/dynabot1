@@ -1,0 +1,14 @@
+# exp_020 (hombros w=-1.0) endereza bien pero acorta el swing a 132ms (era 197 en el campeon).
+# En vez de seguir subiendo el peso -que comprime mas el paso-, se ataca la amplitud en paralelo:
+#   - joint_deviation_shoulder -1.0: la postura recta que pide el usuario
+#   - feet_air_time 1.5 (3x el default 0.5): estirar el vuelo, contrarrestar el pasito corto
+# OJO: feet_air_time tiene threshold 0.5s y el termino es negativo a estas frecuencias (ver
+# leccion 2 en program.md). Subir el PESO amplifica un termino negativo, o sea castiga mas cada
+# pisada. Eso deberia empujar hacia menos pisadas (swing mas largo), que es lo que se busca aca,
+# pero es el mecanismo opuesto al que se penso en exp_002. Se prueba y se mide.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -1.0
+    feet_air_time:
+      weight: 1.5

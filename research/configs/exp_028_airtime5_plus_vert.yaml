@@ -1,0 +1,10 @@
+# La version mas agresiva de amplitud: air_time 5.0 + libertad vertical. Se corre ultimo porque
+# es la mas probable de romper el tracking o volverse inestable.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -1.0
+    feet_air_time:
+      weight: 5.0
+    lin_vel_z_l2:
+      weight: -0.5

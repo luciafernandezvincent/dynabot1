@@ -352,6 +352,9 @@ def main() -> int:
         return 0
 
     if args.rebuild_table:
+        # mismo motivo que en --rescore: re-fijar el hash ANTES de salir por este camino, si no
+        # un --rebuild-table --accept-judge-change deja la referencia vieja y planta todo despues
+        check_judge_integrity(args.accept_judge_change)
         write_results_table()
         return 0
 

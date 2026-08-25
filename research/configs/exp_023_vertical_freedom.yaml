@@ -1,0 +1,11 @@
+# Paso mas amplio via arco mas alto: lin_vel_z_l2 penaliza el movimiento vertical de la base
+# (-2.0), lo que aplasta el arco del paso. Aflojarlo a -0.5 deberia permitir zancadas mas amplias.
+# Combinado con la postura de hombros y el air_time que ya funciono.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -1.0
+    feet_air_time:
+      weight: 1.5
+    lin_vel_z_l2:
+      weight: -0.5

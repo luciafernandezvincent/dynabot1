@@ -305,6 +305,24 @@ class RewardsCfg:
             "tanh_mult": 2.0,
         },
     )
+    # peso 0: disponible para tunear via YAML. Penaliza desviarse de la pose default. Motivo
+    # (usuario, 21/08/2026): en el robot REAL los actuadores hacen mucha mejor fuerza cerca de la
+    # pose default; una postura muy flexionada exige mas torque para el mismo trabajo y fuerza los
+    # servos. dof_pos_limits no sirve para esto: solo castiga cerca del LIMITE de la junta, no la
+    # distancia a la default.
+    joint_deviation = RewTerm(func=mdp.joint_deviation_l1, weight=0.0)
+
+    # variante quirurgica: penaliza desviarse de la default SOLO en las juntas de hombro
+    # (base_to_*_shoulder), que son las que definen si el codo va plegado hacia adentro. Deja
+    # libres shoulder_to_arm y arm_to_hand, que son las que hacen el arco del paso. Motivo:
+    # penalizar TODAS las juntas (exp_016/017) endereza la postura pero achica el paso -despeje
+    # 40.6 -> 10.3 mm, swing 197 -> 134 ms, zancada 2.56 -> 4.54 Hz: pasitos apurados y rasantes.
+    joint_deviation_shoulder = RewTerm(
+        func=mdp.joint_deviation_l1,
+        weight=0.0,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_shoulder"])},
+    )
+
     # -- optional penalties
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-1.0e-4)#-1.0e-5)
     dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=0.0)

@@ -1,0 +1,9 @@
+# Seguir empujando amplitud: feet_air_time 3.0 -> 5.0. La progresion 0.5/1.5/3.0 dio swing de
+# 132/198/269ms, asi que hay margen. Riesgo: a peso muy alto el termino (que es negativo a estas
+# frecuencias) puede dominar sobre el tracking de velocidad.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -1.0
+    feet_air_time:
+      weight: 5.0

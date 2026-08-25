@@ -1,0 +1,11 @@
+# El usuario quiere que las juntas se mantengan cerca de la pose default: en el robot REAL los
+# actuadores hacen mucha mejor fuerza ahi, y una postura muy flexionada (el "camina con los codos"
+# que se ve en video) exige mas torque y fuerza los servos.
+#
+# joint_deviation_l1 penaliza |joint_pos - default_joint_pos|. Es lo correcto para esto;
+# dof_pos_limits solo castiga cerca del limite de la junta, no la distancia a la default.
+# Medido: el codo toca el piso solo 0.01% del tiempo, asi que el problema es POSTURA, no contacto.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2

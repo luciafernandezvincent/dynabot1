@@ -1,0 +1,6 @@
+# exp_019 (solo hombros, w=-0.5) recupero el despeje (41.2mm) pero el usuario dice que la postura
+# "todavia le falta un poco". Se duplica el peso: w=-1.0, siempre solo en hombros.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -1.0

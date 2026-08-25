@@ -36,13 +36,9 @@ PYTHON = "/home/linar/miniconda3/envs/env_isaaclab/bin/python"
 # YAML). Se corren en este orden porque exp_001/002/003 atacan el problema mas grave medido
 # (la baseline sigue el comando de velocidad peor que quedarse quieta).
 QUEUE = [
-    ("exp_011_symmetry.yaml", "exp_011_symmetry", "air_time_variance w=-1.0: la asimetria empeora al subir el despeje"),
-    ("exp_004_clearance_strong.yaml", "exp_004_clearance_strong", "clearance w=1.5 target 5cm: mas peso, objetivo alcanzable"),
-    ("exp_010_trot_gait.yaml", "exp_010_trot_gait", "GaitReward w=5.0, sincronizar diagonales (trote)"),
-    ("exp_005_clearance_low_target.yaml", "exp_005_clearance_low_target", "clearance w=1.0 target 3cm"),
-    ("exp_012_elegant_combo.yaml", "exp_012_elegant_combo", "combo: clearance + trote + simetria"),
-    ("exp_007_clearance_plus_contacts.yaml", "exp_007_clearance_plus_contacts", "undesired_contacts 3x, caidas de hombro"),
-    ("exp_008_bigger_net.yaml", "exp_008_bigger_net", "red actor/critic mas grande [512,256,128]"),
+    ("exp_026_airtime_5.yaml", "exp_026_airtime_5", "feet_air_time 5.0: mas amplitud"),
+    ("exp_027_airtime3_plus_vert.yaml", "exp_027_airtime3_plus_vert", "air_time 3.0 + libertad vertical: los dos mejores juntos"),
+    ("exp_028_airtime5_plus_vert.yaml", "exp_028_airtime5_plus_vert", "air_time 5.0 + libertad vertical: el mas agresivo"),
 ]
 
 

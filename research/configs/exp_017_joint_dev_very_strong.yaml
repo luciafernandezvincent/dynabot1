@@ -1,0 +1,5 @@
+# Aun menos flexionado (pedido del usuario). w=-0.5, 10x el de exp_015 y 2.5x el de exp_016.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.5
