@@ -199,16 +199,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
 
-    # Apply action delay wrapper if action_delay > 1
-    if args_cli.action_delay > 1:
-        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay)
-        logger.info(f"[INFO] Action delay enabled: {args_cli.action_delay} steps delay")
-
     # save resume path before creating a new log_dir
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
         resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
 
-    # wrap for video recording
+    # wrap for video recording (BEFORE the action delay wrapper: ActionDelayWrapper is not a
+    # gymnasium.Env subclass, and RecordVideo asserts isinstance(env, gym.Env) in its __init__)
     if args_cli.video:
         video_kwargs = {
             "video_folder": os.path.join(log_dir, "videos", "train"),
@@ -219,6 +215,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print("[INFO] Recording videos during training.")
         print_dict(video_kwargs, nesting=4)
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
+
+    # Apply action delay wrapper if action_delay > 1
+    if args_cli.action_delay > 1:
+        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay)
+        logger.info(f"[INFO] Action delay enabled: {args_cli.action_delay} steps delay")
 
     start_time = time.time()
 

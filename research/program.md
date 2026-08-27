@@ -141,12 +141,25 @@ LOOP FOREVER:
 6. Si el run falló, `tail -n 50 research/runs/<name>/train.log` para ver el traceback. Si es una
    tontería (typo en el YAML), arreglar y reintentar una vez. Si la idea es inviable, registrar y
    seguir.
-7. **Decidir**: si el score mejoró Y el run es válido → copiar el config resuelto
+7. **Guardar SIEMPRE una explicación detallada**, no solo el score. Comparando contra el run
+   anterior/base directo (no solo contra el campeón global), explicar: qué cambió exactamente, qué
+   se buscaba con ese cambio, y por qué salió mejor o peor — citando las métricas concretas de
+   `eval.py` que lo explican (`fall_rate_per_episode`, `orientation_stability_0to1`,
+   `foot_clearance_peak_m`, `stride_frequency_hz_mean`, `duty_factor_mean`, `joint_deviation_mean_rad`,
+   etc., no solo el score compuesto). Guardarla con:
+   ```bash
+   python research/save_explanation.py <nombre_corrida> <archivo_con_el_texto>
+   ```
+   Esto la mete como clave `_explicacion_detallada` en `logs/rsl_rl/anymal_d_flat/<nombre>/eval/results.json`,
+   sin tocar `eval.py`/`score.py` (los jueces no se tocan). Un score solo, sin esta explicación, no
+   sirve para decidir el siguiente experimento ni para que alguien entienda despues por qué se tomó
+   ese camino.
+8. **Decidir**: si el score mejoró Y el run es válido → copiar el config resuelto
    (`research/runs/<name>/config.resolved.yaml`, sacándole las claves `max_iterations`, `seed` y
    `experiment_name` que fija el runner) a `research/configs/champion.yaml`. Si no mejoró, el
    campeón queda como está y el experimento igual queda registrado.
-8. Commitear los configs y `RESULTS.md` (los checkpoints de `logs/` no se commitean).
-9. Volver a 1.
+9. Commitear los configs y `RESULTS.md` (los checkpoints de `logs/` no se commitean).
+10. Volver a 1.
 
 **NUNCA PARES**: una vez arrancado el loop, no preguntes si seguir. El humano puede estar durmiendo
 y espera encontrarse los resultados a la mañana. Si te quedás sin ideas, pensá más: releé

@@ -1,0 +1,8 @@
+# Probar un lever distinto a los pesos de reward: mas capacidad de red (igual que exp_008 en la
+# investigacion vieja, que sin delay quedo muy cerca del campeon). Aislado contra baseline, sin
+# tocar ningun reward, para ver si mas capacidad ayuda a compensar el delay por si sola.
+agent:
+  actor:
+    hidden_dims: [512, 256, 128]
+  critic:
+    hidden_dims: [512, 256, 128]

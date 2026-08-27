@@ -1,0 +1,20 @@
+# Mejor combo (exp_040) + mas entropy_coef (exploracion durante entrenamiento). Se abandona la
+# linea de "arreglar la asimetria de pata via reward" tras 3 intentos sin exito (exp_042, 043,
+# 044) que confirmaron que es ruido de semilla. Se prueba si mas exploracion da una politica mas
+# robusta en general (protocolo estandar, seed=42).
+env:
+  rewards:
+    feet_air_time:
+      params:
+        threshold: 0.12
+    joint_deviation:
+      weight: -0.1
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.11
+        std: 0.005
+        tanh_mult: 2.0
+agent:
+  algorithm:
+    entropy_coef: 0.01

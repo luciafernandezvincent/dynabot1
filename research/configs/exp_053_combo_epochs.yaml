@@ -1,0 +1,19 @@
+# exp_046 + mas num_learning_epochs (5->8), un lever de estabilidad de PPO mas seguro que
+# entropy_coef (que crasheo en exp_045). Motivado por la variabilidad de semilla vista en
+# exp_044/052: mas epochs por update podria dar una optimizacion mas estable/menos ruidosa.
+env:
+  rewards:
+    feet_air_time:
+      params:
+        threshold: 0.12
+    joint_deviation:
+      weight: -0.15
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.11
+        std: 0.005
+        tanh_mult: 2.0
+agent:
+  algorithm:
+    num_learning_epochs: 8

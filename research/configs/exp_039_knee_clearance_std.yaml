@@ -1,0 +1,11 @@
+# exp_038 (mismo reward, std=0.05) no fue sensible: violation^2 tipico (~0.001-0.003) da
+# exp(-x/0.05) casi pegado a 1.0 con o sin violacion. Bajar std 10x para que la funcion realmente
+# discrimine en el rango de violacion real, manteniendo el mismo weight para aislar el efecto.
+env:
+  rewards:
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.11
+        std: 0.005
+        tanh_mult: 2.0

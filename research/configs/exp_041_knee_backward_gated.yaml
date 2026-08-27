@@ -1,0 +1,13 @@
+# Version del reward filtrada por direccion del comando (rewards.py, reescrito 26/08): en vez de
+# pesar por la velocidad del propio segmento (exp_038/039), solo aplica cuando el comando pide ir
+# para atras. Aislado, mismo weight/std que el mejor conocido (exp_039) para comparar cabeza a
+# cabeza si filtrar por direccion concentra mejor la señal.
+env:
+  rewards:
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.11
+        std: 0.005
+        command_name: base_velocity
+        backward_threshold: 0.1

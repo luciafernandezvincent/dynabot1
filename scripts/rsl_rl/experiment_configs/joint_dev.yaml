@@ -4,21 +4,21 @@
 env:
   rewards:
     track_lin_vel_xy_exp:
-      weight: 1.0
+      weight: 1.5
     track_ang_vel_z_exp:
-      weight: 0.5
+      weight: 0.75
     lin_vel_z_l2:
       weight: -2.0
     ang_vel_xy_l2:
       weight: -0.05
     dof_torques_l2:
-      weight: -1.0e-5
+      weight: -2.5e-5
     dof_acc_l2:
       weight: -2.5e-7
     action_rate_l2:
       weight: -0.1
     feet_air_time:
-      weight: 0.22
+      weight: 0.5
     undesired_contacts:
       weight: -1.0
     flat_orientation_l2:
@@ -48,7 +48,7 @@ agent:
     desired_kl: 0.01
     max_grad_norm: 1.0
   policy:
-    actor_hidden_dims: [512, 256, 128]
-    critic_hidden_dims: [512, 256, 128]
+    actor_hidden_dims: [128, 128, 128]
+    critic_hidden_dims: [128, 128, 128]
     activation: "elu"
     init_noise_std: 1.0

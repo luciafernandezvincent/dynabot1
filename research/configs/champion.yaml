@@ -1,7 +1,7 @@
-# CAMPEON VIGENTE (generado automaticamente, no editar a mano). run_night.py lo actualiza
-# solo si un experimento mejora el score.
-# Actual: exp_001_clearance_on, score 0.5837 (baseline_ar era 0.4790).
-
+# CAMPEON VIGENTE para la segunda tanda de investigacion delay5 (generado a mano el 27/08 a partir
+# del resultado de research/runs/exp_053_combo_epochs_delay5/config.resolved.yaml, el mejor score
+# de la tanda anterior: 0.5467). Se le sacaron max_iterations/seed/experiment_name (los fija el
+# runner). No editar a mano salvo para actualizar a un nuevo campeon.
 env:
   episode_length_s: 20.0
   rewards:
@@ -22,17 +22,21 @@ env:
     feet_air_time:
       weight: 0.5
       params:
-        threshold: 0.5
+        threshold: 0.12
     undesired_contacts:
       weight: -1.0
     flat_orientation_l2:
       weight: -5.0
     dof_pos_limits:
       weight: 0.0
-    foot_clearance:
+    joint_deviation:
+      weight: -0.15
+    knee_clearance:
       weight: 0.5
       params:
-        target_height: 0.05
+        min_height: 0.11
+        std: 0.005
+        tanh_mult: 2.0
 agent:
   num_steps_per_env: 24
   save_interval: 50
@@ -42,7 +46,7 @@ agent:
     use_clipped_value_loss: true
     clip_param: 0.2
     entropy_coef: 0.005
-    num_learning_epochs: 5
+    num_learning_epochs: 8
     num_mini_batches: 4
     learning_rate: 0.001
     schedule: adaptive
@@ -50,13 +54,9 @@ agent:
     lam: 0.95
     desired_kl: 0.01
     max_grad_norm: 1.0
-  # policy.actor_hidden_dims/critic_hidden_dims esta DEPRECADO en esta version de rsl-rl-lib
-  # (>=4.0.0): el shim de compatibilidad lo usa para poblar actor/critic y despues lo vacia,
-  # antes de que un YAML pueda tocarlo. El campo real es actor.hidden_dims / critic.hidden_dims
-  # (encontrado tras exp_008: el primer intento entreno con la red chica de siempre sin avisar).
   actor:
     hidden_dims: [128, 128, 128]
-    activation: "elu"
+    activation: elu
   critic:
     hidden_dims: [128, 128, 128]
-    activation: "elu"
+    activation: elu

@@ -1,0 +1,73 @@
+experiment: exp_054_combo_epochs10_delay5
+score: 0.5341747917115879
+valid: true
+action_delay: 5
+compared_to: baseline_delay5
+explicacion: '[delay5, adaptativo, 12/15 desde la instruccion] barrido: num_learning_epochs
+  8->10 (exp_053 con 8 fue el mejor hasta ahora)'
+config_source: research/configs/exp_054_combo_epochs10.yaml
+hyperparameters:
+  env:
+    episode_length_s: 20.0
+    rewards:
+      track_lin_vel_xy_exp:
+        weight: 1.5
+      track_ang_vel_z_exp:
+        weight: 0.75
+      lin_vel_z_l2:
+        weight: -2.0
+      ang_vel_xy_l2:
+        weight: -0.05
+      dof_torques_l2:
+        weight: -2.5e-05
+      dof_acc_l2:
+        weight: -2.5e-07
+      action_rate_l2:
+        weight: -0.1
+      feet_air_time:
+        weight: 0.5
+        params:
+          threshold: 0.12
+      undesired_contacts:
+        weight: -1.0
+      flat_orientation_l2:
+        weight: -5.0
+      dof_pos_limits:
+        weight: 0.0
+      joint_deviation:
+        weight: -0.15
+      knee_clearance:
+        weight: 0.5
+        params:
+          min_height: 0.11
+          std: 0.005
+          tanh_mult: 2.0
+  agent:
+    num_steps_per_env: 24
+    save_interval: 50
+    empirical_normalization: false
+    algorithm:
+      value_loss_coef: 1.0
+      use_clipped_value_loss: true
+      clip_param: 0.2
+      entropy_coef: 0.005
+      num_learning_epochs: 10
+      num_mini_batches: 4
+      learning_rate: 0.001
+      schedule: adaptive
+      gamma: 0.99
+      lam: 0.95
+      desired_kl: 0.01
+      max_grad_norm: 1.0
+    actor:
+      hidden_dims:
+      - 128
+      - 128
+      - 128
+      activation: elu
+    critic:
+      hidden_dims:
+      - 128
+      - 128
+      - 128
+      activation: elu

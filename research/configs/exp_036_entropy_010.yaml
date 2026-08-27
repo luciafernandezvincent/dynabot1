@@ -1,0 +1,5 @@
+# Otro lever de PPO (no reward): duplicar entropy_coef (0.005->0.01) para mas exploracion,
+# hipotesis de que ayuda a encontrar estrategias mas robustas al delay. Aislado contra baseline.
+agent:
+  algorithm:
+    entropy_coef: 0.01

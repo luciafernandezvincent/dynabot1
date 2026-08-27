@@ -1,0 +1,7 @@
+# air_time_variance_penalty (uniformidad entre patas, pedido del usuario) sobre el campeon nuevo
+# (con epochs=8). En exp_042 (epochs=5) ayudo al peor caso pero con costo de caidas; se prueba de
+# nuevo ahora que el entrenamiento es mas estable.
+env:
+  rewards:
+    air_time_variance:
+      weight: -1.0

@@ -1,0 +1,11 @@
+# Primera prueba del reward nuevo knee_clearance (agregado 26/08 a pedido del usuario, penaliza
+# que el arm_link pase por debajo de min_height). min_height=0.11 es el objetivo real pedido por
+# el usuario (no el 0.0579 de baseline_ar, que es solo la referencia de comparacion en score.py).
+# Aislado contra baseline, peso moderado (mismo orden de magnitud que joint_deviation, que opera
+# sobre cantidades igual de chicas: rad^2 vs m^2).
+env:
+  rewards:
+    knee_clearance:
+      weight: -5.0
+      params:
+        min_height: 0.11

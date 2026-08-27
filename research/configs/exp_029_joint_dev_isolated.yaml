@@ -1,0 +1,6 @@
+# Aislar joint_deviation (sin heredar foot_clearance de exp_001/champion.yaml) para separar
+# el efecto bajo delay=5. Mismo peso que exp_016_joint_dev_strong.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2

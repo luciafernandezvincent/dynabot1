@@ -1,0 +1,7 @@
+# Barrido del threshold ganador de exp_002 (0.12s) bajo delay=5: probar mas alto (0.20s), aislado
+# contra baseline, para confirmar si 0.12 es un pico local (exp_030 con 0.08 ya salio peor).
+env:
+  rewards:
+    feet_air_time:
+      params:
+        threshold: 0.20

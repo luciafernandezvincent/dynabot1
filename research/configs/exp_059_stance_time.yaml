@@ -1,0 +1,10 @@
+# Reward nuevo (pedido del usuario 27/08): premia que el tiempo de apoyo se acerque a un objetivo,
+# para uniformidad entre patas y marcha mas lenta. target=0.15s (casi el doble del ~0.083s actual,
+# duty_factor_mean=0.39 con stride~4.73Hz). Aislado sobre el campeon nuevo (exp_053).
+env:
+  rewards:
+    stance_time:
+      weight: 0.5
+      params:
+        target_contact_time: 0.15
+        std: 0.01

@@ -1,0 +1,11 @@
+# Combinar stance_time (exp_059, mejor knee_height=0.086 aislado, aunque con costo de estabilidad)
+# con el campeon completo (que ya incluye knee_clearance=0.5). Ver si los dos factores de
+# "levantar la rodilla" (knee_clearance directo + stance_time indirecto via mas tiempo de apoyo)
+# sinergizan en vez de sumar solo el costo de estabilidad de cada uno.
+env:
+  rewards:
+    stance_time:
+      weight: 0.5
+      params:
+        target_contact_time: 0.15
+        std: 0.01

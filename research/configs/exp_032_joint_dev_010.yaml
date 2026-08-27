@@ -1,0 +1,7 @@
+# Barrido de joint_deviation bajo delay=5, aislado contra baseline (linea de exp_029, w=-0.2,
+# score 0.5081). Probar mas suave (w=-0.1) para ver si el problema era el peso muy fuerte o si
+# joint_deviation en si es malo bajo delay independientemente del peso.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.1

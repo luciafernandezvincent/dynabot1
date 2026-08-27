@@ -35,6 +35,10 @@ parser.add_argument(
 )
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
 parser.add_argument("--action-delay", type=int, default=1, help="Number of steps to delay actions (1 = no delay)")
+parser.add_argument(
+    "--experiment_config", type=str, default=None,
+    help="Path to a YAML with env/agent overrides used to train the checkpoint being played.",
+)
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -95,6 +99,9 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 import dynabot1.tasks  # noqa: F401
 from dynabot1.wrappers import ActionDelayWrapper
 
+# local imports
+from experiment_config import apply_experiment_config  # isort: skip
+
 
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlBaseRunnerCfg):
@@ -109,6 +116,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # handle deprecated configurations
     agent_cfg = handle_deprecated_rsl_rl_cfg(agent_cfg, installed_version)
+
+    # apply the SAME env/agent overrides used to train this checkpoint, if given
+    if args_cli.experiment_config is not None:
+        apply_experiment_config(env_cfg, agent_cfg, args_cli.experiment_config)
 
     # set the environment seed
     # note: certain randomizations occur in the environment initialization so we set the seed here
@@ -145,12 +156,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
 
-    # Apply action delay wrapper if action_delay > 1
-    if args_cli.action_delay > 1:
-        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay)
-        print(f"[INFO] Action delay enabled: {args_cli.action_delay} steps delay")
-
-    # wrap for video recording
+    # wrap for video recording (BEFORE the action delay wrapper: ActionDelayWrapper is not a
+    # gymnasium.Env subclass, and RecordVideo asserts isinstance(env, gym.Env) in its __init__)
     if args_cli.video:
         video_kwargs = {
             "video_folder": os.path.join(log_dir, "videos", "play"),
@@ -161,6 +168,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print("[INFO] Recording videos during training.")
         print_dict(video_kwargs, nesting=4)
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
+
+    # Apply action delay wrapper if action_delay > 1
+    if args_cli.action_delay > 1:
+        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay)
+        print(f"[INFO] Action delay enabled: {args_cli.action_delay} steps delay")
 
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)

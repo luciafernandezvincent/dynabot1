@@ -1,0 +1,9 @@
+# stance_time con target menos ambicioso (0.15->0.12s), weight/std iguales a exp_059 (la mejor
+# combinacion de knee_height hasta ahora, 0.086, pero con costo de estabilidad).
+env:
+  rewards:
+    stance_time:
+      weight: 0.5
+      params:
+        target_contact_time: 0.12
+        std: 0.01

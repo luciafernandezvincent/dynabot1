@@ -1,0 +1,9 @@
+# stance_time_reward con menos peso (0.5->0.3) para conservar la mejora de knee_height de exp_059
+# (0.086, la mejor hasta ahora) con menos costo de caidas.
+env:
+  rewards:
+    stance_time:
+      weight: 0.3
+      params:
+        target_contact_time: 0.15
+        std: 0.01

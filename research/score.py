@@ -54,14 +54,24 @@ from pathlib import Path
 
 #: Peso de cada termino del score. Suman 1.0.
 WEIGHTS = {
-    "velocity_tracking": 0.35,  # sigue el comando de velocidad (lo mas importante)
-    "foot_clearance": 0.15,  # levanta las patas de verdad (ver nota abajo)
-    "orientation_stability": 0.15,  # roll/pitch constantes: no cabecea ni se balancea
-    "orientation_smoothness": 0.10,  # sin rotaciones bruscas del cuerpo
-    "movement_smoothness": 0.10,  # aceleraciones articulares bajas (menos desgaste del servo)
-    "impact": 0.10,  # pisadas suaves (protege el hardware real)
+    "velocity_tracking": 0.30,  # sigue el comando de velocidad (lo mas importante)
+    "foot_clearance": 0.13,  # levanta las patas de verdad (ver nota abajo)
+    "knee_clearance": 0.12,  # no arrastra la rodilla (arm_link), adelante o atras (ver nota abajo)
+    "orientation_stability": 0.13,  # roll/pitch constantes: no cabecea ni se balancea
+    "orientation_smoothness": 0.09,  # sin rotaciones bruscas del cuerpo
+    "movement_smoothness": 0.09,  # aceleraciones articulares bajas (menos desgaste del servo)
+    "impact": 0.09,  # pisadas suaves (protege el hardware real)
     "gait": 0.05,  # marcha en rango de frecuencia / duty factor razonable
 }
+
+# NOTA sobre knee_clearance (agregado 26/08 a pedido del usuario): yendo hacia atras el robot
+# tiende a plegar la pata y el segmento medio (arm_link) pasa muy cerca del piso, casi "gateando",
+# sin necesariamente disparar el sensor de contacto de undesired_contacts. Se puntua con el PEOR
+# caso (altura minima) entre comando hacia atras Y hacia adelante -- no solo atras, porque no hay
+# motivo para dejar de vigilar el caso adelante -- y no la media, porque lo que importa es si en
+# algun momento raspa el piso. Si el eval no incluyo ninguna de las dos direcciones de comando,
+# este termino queda ausente de `terms` (no puntua, pero tampoco invalida la corrida): ver
+# `knee_height_min_backward_m` / `knee_height_min_forward_m`.
 
 # NOTA sobre foot_clearance (agregado 21/08 a pedido del usuario): duty_factor y
 # stride_frequency solo miran el sensor de contacto, asi que un pie que despega 2 mm produce
@@ -83,6 +93,12 @@ REF_ANGULAR_ACC = 7.5271  # aceleracion angular media de la base, rad/s^2 (menos
 REF_JOINT_ACC = 0.013605  # aceleracion articular media, rad/paso^2 (menos es mejor)
 REF_IMPACT_FORCE = 74.77  # fuerza media de pisada en N (menos es mejor)
 REF_FOOT_CLEARANCE = 0.0229  # despeje pico (percentil 95) en m (mas es mejor)
+# Calibrado 26/08/2026 re-corriendo eval.py sobre el checkpoint de baseline_ar (sin delay, mismo
+# protocolo original: 1000 envs x 1000 pasos, seed 42). Verificado reproducible: velocity_tracking
+# y foot_clearance_peak_m dieron identicos al results.json historico. knee_height_min_backward_m
+# = 0.0579, knee_height_min_forward_m = 0.0609; se usa el peor caso (menor), igual que el criterio
+# de min(...) aplicado mas abajo en _terms_from_results.
+REF_KNEE_CLEARANCE_MIN = 0.0579  # m, knee_height_min_m de baseline_ar yendo para atras (mas es mejor)
 
 #: Banda objetivo de frecuencia de zancada por pata, en Hz (ni arrastrar las patas ni vibrar).
 STRIDE_BAND_HZ = (1.5, 3.5)
@@ -218,6 +234,26 @@ def _terms_from_results(results: dict) -> tuple[dict[str, float], dict[str, floa
         terms["foot_clearance"] = _higher_is_better(clearance, REF_FOOT_CLEARANCE)
     else:
         missing.append("foot_clearance_peak_m")
+
+    # Rodilla (arm_link) rozando el piso: se usa el minimo (no la media) de CADA direccion de
+    # comando y despues el peor de los dos, porque el problema puede aparecer en cualquiera de
+    # las dos (se detecto yendo hacia atras, pero no hay motivo para no vigilar tambien adelante).
+    # Si ambos campos estan presentes pero en None, este eval no incluyo esa direccion de comando:
+    # no se puntua el termino, pero tampoco se marca "missing" (no es que falte la metrica).
+    if "knee_height_min_backward_m" in results and "knee_height_min_forward_m" in results:
+        knee_min_backward = results["knee_height_min_backward_m"]
+        knee_min_forward = results["knee_height_min_forward_m"]
+        candidates = [float(v) for v in (knee_min_backward, knee_min_forward) if v is not None]
+        if candidates:
+            knee_min = min(candidates)
+            raw["knee_clearance_min_m"] = knee_min
+            if knee_min_backward is not None:
+                raw["knee_clearance_min_backward_m"] = float(knee_min_backward)
+            if knee_min_forward is not None:
+                raw["knee_clearance_min_forward_m"] = float(knee_min_forward)
+            terms["knee_clearance"] = _higher_is_better(knee_min, REF_KNEE_CLEARANCE_MIN)
+    else:
+        missing.append("knee_height_min_backward_m/knee_height_min_forward_m")
 
     # Marcha: frecuencia de zancada y duty factor dentro de bandas razonables.
     # Ojo: los results.json anteriores a la version actual de eval.py traen 'movement_frequency_hz',

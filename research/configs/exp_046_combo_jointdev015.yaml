@@ -1,0 +1,16 @@
+# Afinar joint_deviation dentro del combo ganador (exp_040 uso -0.1). Se abandonan los levers de
+# PPO (entropy_coef crasheo en exp_045); se vuelve a variaciones chicas de reward, que es lo que
+# vino funcionando de forma estable en toda la investigacion.
+env:
+  rewards:
+    feet_air_time:
+      params:
+        threshold: 0.12
+    joint_deviation:
+      weight: -0.15
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.11
+        std: 0.005
+        tanh_mult: 2.0

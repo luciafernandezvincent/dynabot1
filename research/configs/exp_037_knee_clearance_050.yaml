@@ -1,0 +1,8 @@
+# Barrido de peso de knee_clearance: exp_036 con w=-5.0 no tuvo efecto medible (knee_height casi
+# sin cambios). Subir 10x para confirmar si el problema era magnitud de la señal.
+env:
+  rewards:
+    knee_clearance:
+      weight: -50.0
+      params:
+        min_height: 0.11

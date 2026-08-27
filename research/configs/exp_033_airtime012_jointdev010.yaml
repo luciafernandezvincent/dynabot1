@@ -1,0 +1,10 @@
+# Combinar los dos factores probados aislados bajo delay=5: feet_air_time.threshold=0.12 (exp_002,
+# el mejor con +0.0105 vs baseline) + joint_deviation w=-0.1 (exp_032, el mejor de su barrido pero
+# aun por debajo de baseline). Ver si interactuan mejor juntos.
+env:
+  rewards:
+    feet_air_time:
+      params:
+        threshold: 0.12
+    joint_deviation:
+      weight: -0.1

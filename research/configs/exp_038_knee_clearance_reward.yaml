@@ -1,0 +1,12 @@
+# Rediseno de knee_clearance tras exp_036/037 (el penalty x^2 sin acotar empeoraba al subir el
+# peso). Nueva formula: exp(-error/std) acotado, pesado por velocidad horizontal, igual patron
+# que foot_clearance_reward. Weight POSITIVO ahora (es una recompensa, no una penalizacion cruda).
+# Peso inicial 0.5, igual al de foot_clearance en exp_001 (que funciono bien con esa magnitud).
+env:
+  rewards:
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.11
+        std: 0.05
+        tanh_mult: 2.0

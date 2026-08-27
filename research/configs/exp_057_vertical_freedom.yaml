@@ -1,0 +1,8 @@
+# Pedido del usuario (27/08): aflojar la restriccion de velocidad vertical de la base ("peso de
+# gravedad") para que tenga mas libertad de movimiento, sobre el nuevo campeon (exp_053).
+# lin_vel_z_l2 -2.0 -> -0.5, mismo valor que se probo sin delay en exp_023 (no ayudo en ese
+# contexto, pero nunca se probo combinado con knee_clearance + epochs=8 bajo delay).
+env:
+  rewards:
+    lin_vel_z_l2:
+      weight: -0.5

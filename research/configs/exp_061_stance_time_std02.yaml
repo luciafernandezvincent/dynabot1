@@ -1,0 +1,9 @@
+# Volver a weight=0.5 (exp_059, dio el mejor knee_height=0.086 pero con mas caidas) y aflojar std
+# (0.01->0.02) en vez de bajar el peso -- bajar el peso en exp_060 perdio el efecto en la rodilla.
+env:
+  rewards:
+    stance_time:
+      weight: 0.5
+      params:
+        target_contact_time: 0.15
+        std: 0.02

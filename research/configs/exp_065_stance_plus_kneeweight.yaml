@@ -1,0 +1,16 @@
+# stance_time (exp_059) + subir knee_clearance weight (0.5->1.0). knee_clearance=1.5 fallo en
+# exp_043 (epochs=5), pero nunca se probo un peso mas alto combinado con epochs=8 (mas estable) ni
+# junto con stance_time.
+env:
+  rewards:
+    stance_time:
+      weight: 0.5
+      params:
+        target_contact_time: 0.15
+        std: 0.01
+    knee_clearance:
+      weight: 1.0
+      params:
+        min_height: 0.11
+        std: 0.005
+        tanh_mult: 2.0

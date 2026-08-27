@@ -1,0 +1,16 @@
+# Afinar threshold dentro del combo con joint_deviation=-0.15 (exp_046, que mejoro knee_height sin
+# perder score). Probar threshold=0.10 (mas bajo que el 0.12 optimo aislado) para ver si combinado
+# con el resto hay un optimo distinto.
+env:
+  rewards:
+    feet_air_time:
+      params:
+        threshold: 0.10
+    joint_deviation:
+      weight: -0.15
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.11
+        std: 0.005
+        tanh_mult: 2.0

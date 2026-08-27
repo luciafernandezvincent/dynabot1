@@ -51,6 +51,31 @@ def foot_clearance_reward(
     return torch.exp(-torch.sum(reward, dim=1) / std)
 
 
+def knee_clearance_reward(
+    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, min_height: float, std: float, tanh_mult: float
+) -> torch.Tensor:
+    """Recompensa que el segmento medio de la pata (``arm_link``, la "rodilla") se mantenga por
+    encima de una altura minima sobre el piso, mientras se esta moviendo horizontalmente.
+
+    Medido con eval.py (26/08): yendo hacia atras el arm_link puede pasar a pocos cm del piso
+    (casi "gateando") sin llegar a disparar el sensor de contacto de ``undesired_contacts``.
+
+    Historial (26/08): v1 (exp_036/037) penalty x^2 sin acotar, empeoraba al subir el peso. v2
+    (esta, exp_038/039/040) exp(-error/std) pesado por velocidad del segmento, mismo patron que
+    ``foot_clearance_reward`` -- con std bien calibrado (0.005) mejora knee_height_min_backward_m
+    y es el mejor resultado medido hasta ahora (exp_040, combinado con otros factores). Se probo
+    una v3 filtrando por direccion del comando en vez de por velocidad del segmento (hipotesis:
+    concentrar la señal solo en el caso "para atras"), pero salio PEOR que v2 aislada (exp_041:
+    0.4820 vs exp_039: 0.5284) -- se descarto y se volvio a v2.
+    """
+    asset = env.scene[asset_cfg.name]
+    knee_z = asset.data.body_pos_w[:, asset_cfg.body_ids, 2]
+    violation_sq = torch.square(torch.clamp(min_height - knee_z, min=0.0))
+    knee_velocity_tanh = torch.tanh(tanh_mult * torch.norm(asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :2], dim=2))
+    reward = violation_sq * knee_velocity_tanh
+    return torch.exp(-torch.sum(reward, dim=1) / std)
+
+
 def feet_air_time_positive_biped(
     env: ManagerBasedRLEnv, command_name: str, threshold: float, sensor_cfg: SceneEntityCfg
 ) -> torch.Tensor:
@@ -90,6 +115,23 @@ def air_time_variance_penalty(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg
     return torch.var(torch.clip(last_air_time, max=0.5), dim=1) + torch.var(
         torch.clip(last_contact_time, max=0.5), dim=1
     )
+
+
+def stance_time_reward(
+    env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, target_contact_time: float, std: float
+) -> torch.Tensor:
+    """Recompensa que el tiempo de apoyo (contacto) de cada pata se acerque a un valor objetivo.
+
+    Pedido del usuario (27/08): un termino que mida el tiempo en el piso de la pata para que el
+    movimiento sea mas uniforme entre patas (todas tienden al mismo tiempo de apoyo, en vez de solo
+    penalizar la varianza como ``air_time_variance_penalty``, que en exp_042/058 no funciono) y
+    mas lento (target_contact_time mayor que el duty factor actual alarga la zancada). Mismo
+    patron que ``foot_clearance_reward``: ``exp(-error/std)`` acotado en (0, 1].
+    """
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    contact_time = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids]
+    error = torch.square(contact_time - target_contact_time)
+    return torch.exp(-torch.sum(error, dim=1) / std)
 
 
 class GaitReward(ManagerTermBase):

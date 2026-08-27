@@ -1,0 +1,12 @@
+# Combo: el threshold ganador (exp_002) + la red grande (exp_034), para ver si mas capacidad
+# ayuda a explotar mejor el factor que si funciono bajo delay.
+env:
+  rewards:
+    feet_air_time:
+      params:
+        threshold: 0.12
+agent:
+  actor:
+    hidden_dims: [512, 256, 128]
+  critic:
+    hidden_dims: [512, 256, 128]

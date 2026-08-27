@@ -130,6 +130,17 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
     if state["arm_ids"] is None:
         state["arm_ids"], state["arm_names"] = contact_sensor.find_bodies(".*arm_link")
     arm_in_contact = contact_sensor.data.current_contact_time[:, state["arm_ids"]] > 0.0
+
+    # altura del segmento medio de la pata (arm_link, la "rodilla") sobre el piso. A diferencia
+    # de elbow_contact_rate, que solo cuenta cuando el sensor YA esta en contacto, esto mide la
+    # distancia real en todo momento: yendo hacia atras el robot puede pasar muy cerca del piso
+    # (casi "gateando") sin llegar a disparar el umbral de contacto de undesired_contacts.
+    knee_z = articulation_for_feet.data.body_pos_w[:, state["arm_ids"], 2].detach().cpu().numpy()
+    if state["knee_z"] is None:
+        state["knee_z"] = []
+        state["knee_backward_mask"] = []
+        state["knee_forward_mask"] = []
+    state["knee_z"].append(knee_z)
     state["arm_contact_steps"] += arm_in_contact.sum().item()
     arm_forces = torch.norm(contact_sensor.data.net_forces_w[:, state["arm_ids"], :], dim=-1)
     arm_force_in_contact = arm_forces[arm_in_contact]
@@ -191,6 +202,10 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
             state["actual_vels"] = []
         state["cmd_vels"].append(cmd_vel)
         state["actual_vels"].append(actual_vel)
+        # marca los steps donde se pidio caminar hacia atras/adelante, para poder aislar el
+        # "gateo" hacia atras del caso hacia adelante (donde no se observo el problema)
+        state["knee_backward_mask"].append(cmd_vel[:, 0] < -0.1)
+        state["knee_forward_mask"].append(cmd_vel[:, 0] > 0.1)
         # rapidez horizontal real, para derivar el largo de paso (velocidad / frecuencia)
         state["speed_sum"] += float(np.linalg.norm(actual_lin_vel_b, axis=-1).mean())
         state["speed_steps"] += 1
@@ -265,6 +280,57 @@ def compute_foot_clearance(foot_z, foot_in_contact, foot_names):
     mean_all = float(np.mean(list(mean_per_foot.values()))) if mean_per_foot else 0.0
     peak_all = float(np.mean(list(peak_per_foot.values()))) if peak_per_foot else 0.0
     return mean_per_foot, peak_per_foot, mean_all, peak_all
+
+
+def compute_knee_clearance(knee_z, knee_backward_mask, knee_forward_mask, arm_names):
+    """Altura minima/media del segmento arm_link (aprox. la rodilla) respecto al piso.
+
+    Complementa a elbow_contact_rate: esa metrica solo ve el instante en que el sensor de
+    contacto YA se activo, esto mide la distancia real en todo momento. Se reporta en general y
+    separado por direccion de comando (adelante / atras), porque el "gateo" se observo
+    especificamente yendo hacia atras. Los desgloses direccionales quedan en None (no 0.0) si el
+    eval no incluyo comando en esa direccion, para no confundir "no hay datos" con "toco el piso".
+
+    Tambien se desglosa el minimo POR PATA y direccion (min_per_knee_backward/forward): el minimo
+    agregado de las 4 patas puede esconder que una sola pata concentra todo el problema (visto en
+    exp_040: el promedio general por pata no distinguia direccion y no alcanzaba para confirmar
+    cual pata rozaba el piso yendo para atras).
+    """
+    if not knee_z:
+        return {}, 0.0, 0.0, None, None, None, None, None, None
+
+    z = np.array(knee_z)  # (num_steps, num_envs, num_knees)
+    mean_per_knee = {name: float(np.mean(z[:, :, i])) for i, name in enumerate(arm_names)}
+    mean_all = float(np.mean(z))
+    min_all = float(np.min(z))
+
+    def _masked_stats(mask_list):
+        if not mask_list or len(mask_list) != z.shape[0]:
+            return None, None
+        mask = np.array(mask_list)  # (num_steps, num_envs)
+        if not mask.any():
+            return None, None
+        z_masked = z[mask]  # (num_samples, num_knees)
+        return float(np.mean(z_masked)), float(np.min(z_masked))
+
+    def _masked_min_per_knee(mask_list):
+        if not mask_list or len(mask_list) != z.shape[0]:
+            return None
+        mask = np.array(mask_list)  # (num_steps, num_envs)
+        if not mask.any():
+            return None
+        z_masked = z[mask]  # (num_samples, num_knees)
+        return {name: float(np.min(z_masked[:, i])) for i, name in enumerate(arm_names)}
+
+    mean_backward, min_backward = _masked_stats(knee_backward_mask)
+    mean_forward, min_forward = _masked_stats(knee_forward_mask)
+    min_per_knee_backward = _masked_min_per_knee(knee_backward_mask)
+    min_per_knee_forward = _masked_min_per_knee(knee_forward_mask)
+
+    return (
+        mean_per_knee, mean_all, min_all, mean_backward, min_backward, mean_forward, min_forward,
+        min_per_knee_backward, min_per_knee_forward,
+    )
 
 
 def quat_to_euler(quat):
@@ -386,6 +452,21 @@ def compute_results(env, state: dict) -> dict:
         state["foot_z"], state["foot_in_contact"], state["foot_names"] or []
     )
 
+    # Altura de la rodilla (arm_link) sobre el piso: en general, y aislada por direccion de comando
+    (
+        knee_mean_per_link,
+        knee_height_mean,
+        knee_height_min,
+        knee_height_mean_backward,
+        knee_height_min_backward,
+        knee_height_mean_forward,
+        knee_height_min_forward,
+        knee_height_min_per_link_backward,
+        knee_height_min_per_link_forward,
+    ) = compute_knee_clearance(
+        state["knee_z"], state["knee_backward_mask"], state["knee_forward_mask"], state["arm_names"] or []
+    )
+
     # Calculate orientation metrics
     orientation_stability = compute_orientation_stability(state["base_quats"]) if state["base_quats"] else 0.0
     orientation_smoothness = (
@@ -443,6 +524,15 @@ def compute_results(env, state: dict) -> dict:
         "foot_clearance_peak_m": clearance_peak,
         "foot_clearance_mean_per_foot_m": clearance_mean_per_foot,
         "foot_clearance_peak_per_foot_m": clearance_peak_per_foot,
+        "knee_height_mean_m": knee_height_mean,
+        "knee_height_min_m": knee_height_min,
+        "knee_height_mean_per_link_m": knee_mean_per_link,
+        "knee_height_mean_backward_m": knee_height_mean_backward,
+        "knee_height_min_backward_m": knee_height_min_backward,
+        "knee_height_mean_forward_m": knee_height_mean_forward,
+        "knee_height_min_forward_m": knee_height_min_forward,
+        "knee_height_min_per_link_backward_m": knee_height_min_per_link_backward,
+        "knee_height_min_per_link_forward_m": knee_height_min_per_link_forward,
         "orientation_stability_0to1": orientation_stability,
         "orientation_smoothness_0to1": orientation_smoothness,
         "velocity_tracking_accuracy_0to1": velocity_tracking,
@@ -542,6 +632,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "foot_in_contact": None,
         "arm_ids": None,
         "arm_names": None,
+        "knee_z": None,
+        "knee_backward_mask": None,
+        "knee_forward_mask": None,
         "arm_contact_steps": 0,
         "arm_contact_force_sum": 0.0,
         "arm_contact_force_max": 0.0,

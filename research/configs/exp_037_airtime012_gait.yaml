@@ -1,0 +1,11 @@
+# Combo: threshold ganador (exp_002) + GaitReward (trote sincronizado). El termino "gait" ya
+# existe en RewardsCfg con todos sus params default (std, max_err, synced_feet_pair_names,
+# asset_cfg, sensor_cfg) y weight=0.0; solo hace falta subir el weight, no redefinir los params
+# (evita reconstruir SceneEntityCfg a mano, que rompe el merge de apply_overrides).
+env:
+  rewards:
+    feet_air_time:
+      params:
+        threshold: 0.12
+    gait:
+      weight: 5.0

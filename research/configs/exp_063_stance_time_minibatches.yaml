@@ -1,0 +1,13 @@
+# Config de exp_059 (mejor knee_height=0.086, pero 5 caidas) + mas num_mini_batches (4->8) para
+# gradientes mas estables, sin agregar exploracion nueva (entropy_coef ya crasheo en la tanda
+# anterior, se evita ese lever).
+env:
+  rewards:
+    stance_time:
+      weight: 0.5
+      params:
+        target_contact_time: 0.15
+        std: 0.01
+agent:
+  algorithm:
+    num_mini_batches: 8

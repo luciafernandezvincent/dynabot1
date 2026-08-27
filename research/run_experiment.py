@@ -47,6 +47,7 @@ TRAIN_NUM_ENVS = 4096
 SEED = 42
 EVAL_NUM_ENVS = 1000
 EVAL_NUM_STEPS = 1000
+ACTION_DELAY = 5
 VIDEO_NUM_ENVS = 10  # perros en pantalla
 VIDEO_LENGTH_STEPS = 300  # 300 pasos * 0.02 s de step_dt = 6 s de video
 VIDEO_TIMEOUT_S = 900
@@ -265,7 +266,7 @@ def record_video(
     score: si falla, se registra el error y el experimento sigue siendo valido.
     """
     video_cmd = [
-        sys.executable, "scripts/rsl_rl/play.py",
+        sys.executable, "scripts/rsl_rl/play_delay.py",
         f"--task={TASK}",
         "--headless",
         "--video",
@@ -273,6 +274,7 @@ def record_video(
         f"--load_run={name}",
         f"--num_envs={VIDEO_NUM_ENVS}",
         f"--seed={seed}",
+        f"--action-delay={ACTION_DELAY}"
     ]
     if experiment_config is not None:
         video_cmd.append(f"--experiment_config={experiment_config}")
@@ -408,6 +410,7 @@ def main() -> int:
         f"--name={name}",
         f"--seed={args.seed}",
         f"--experiment_config={resolved_path}",
+        f"--action-delay={ACTION_DELAY}"
     ]
     eval_cmd = [
         sys.executable, "scripts/rsl_rl/eval.py",
@@ -418,6 +421,7 @@ def main() -> int:
         f"--num_steps={EVAL_NUM_STEPS}",
         f"--seed={args.seed}",
         f"--experiment_config={resolved_path}",
+        f"--action-delay={ACTION_DELAY}",
     ]
 
     if args.dry_run:
@@ -437,6 +441,7 @@ def main() -> int:
         "iterations": args.iterations,
         "num_envs": args.num_envs,
         "seed": args.seed,
+        "action_delay": ACTION_DELAY,
         "judge_hashes": judge_hashes(),
     }
 

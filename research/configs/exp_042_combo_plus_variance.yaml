@@ -1,0 +1,20 @@
+# Mejor combo conocido (exp_040: threshold=0.12 + joint_dev=-0.1 + knee_clearance v2) + 
+# air_time_variance_penalty (investigacion historica, exp_011: penaliza que una pata trabaje
+# distinto de las demas). Motivado por el desglose por pata de exp_040: front_right_arm_link
+# rozaba el piso (0.052m) mientras las otras 3 patas andaban bien (0.19-0.235m) -- una asimetria
+# de una sola pata, exactamente lo que este termino ataca.
+env:
+  rewards:
+    feet_air_time:
+      params:
+        threshold: 0.12
+    joint_deviation:
+      weight: -0.1
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.11
+        std: 0.005
+        tanh_mult: 2.0
+    air_time_variance:
+      weight: -1.0

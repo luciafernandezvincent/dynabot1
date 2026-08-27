@@ -294,6 +294,19 @@ class RewardsCfg:
         weight=0.0,
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*hand_link")},
     )
+    # peso 0 por defecto: disponible para tunear via YAML. Pedido del usuario (27/08): premia que
+    # el tiempo de apoyo de cada pata se acerque a target_contact_time, para marcha mas uniforme y
+    # mas lenta (target mas alto que el duty factor actual). air_time_variance (arriba) no logro
+    # esto en exp_042/058 -- este apunta a un VALOR objetivo, no solo a reducir la varianza.
+    stance_time = RewTerm(
+        func=mdp.stance_time_reward,
+        weight=0.0,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*hand_link"),
+            "target_contact_time": 0.15,
+            "std": 0.01,
+        },
+    )
 
     foot_clearance = RewTerm(
         func=mdp.foot_clearance_reward,
@@ -302,6 +315,23 @@ class RewardsCfg:
             "asset_cfg": SceneEntityCfg("robot", body_names=".*hand_link"),
             "target_height": 0.05,
             "std": 0.05,
+            "tanh_mult": 2.0,
+        },
+    )
+    # peso 0 por defecto: disponible para tunear via YAML. Recompensa mantener el segmento medio
+    # de la pata (arm_link, la "rodilla") por encima de min_height (score.py: termino
+    # "knee_clearance"). min_height=0.11 es el objetivo real pedido por el usuario (26/08), no el
+    # 0.0579 de baseline_ar (esa es solo la referencia de comparacion en score.py:
+    # REF_KNEE_CLEARANCE_MIN, que a proposito NO cambia con esto). v2 (exp(-error/std), pesado por
+    # velocidad del segmento): mejor resultado medido hasta ahora (exp_040). Una v3 (filtro por
+    # direccion del comando) salio peor (exp_041) y se descarto, ver rewards.py.
+    knee_clearance = RewTerm(
+        func=mdp.knee_clearance_reward,
+        weight=0.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*arm_link"),
+            "min_height": 0.11,
+            "std": 0.005,
             "tanh_mult": 2.0,
         },
     )
