@@ -1,0 +1,38 @@
+# exp_107 — primer uso del reward NUEVO que penaliza pisar fuerte.
+#
+# BASE: champion.yaml = exp_104 (joint_deviation -0.2 + feet_air_time 1.5 + gait 5.0, score 0.5674)
+# CAMBIO: activar `foot_impact` con weight -0.01 (umbral 50 N, el default del term)
+#
+# CONTEXTO. El impacto es el termino mas debil del campeon (norm 0.426 de 1.0) y ademas un costo
+# real de hardware: 100.8 N contra 74.0 N de la baseline. Dos intentos de bajarlo INDIRECTAMENTE
+# fallaron:
+#   exp_105 (mas tiempo de vuelo, feet_air_time 3.0)  -> impacto 109.0 N (peor)
+#   exp_106 (mas tiempo de apoyo, stance_time 0.5)    -> impacto 103.3 N (peor)
+# La causa de fondo: ningun reward existente mira la fuerza de la pisada. `undesired_contacts`
+# cuenta contactos del arm_link y `dof_torques_l2` mide torque del actuador, que no es el golpe
+# contra el piso.
+#
+# EL TERMINO NUEVO (pedido del usuario el 08/09/2026): `foot_impact_penalty` en mdp/rewards.py,
+# registrado como `foot_impact` con peso 0 por defecto. Penaliza `clamp(F - threshold, min=0)`
+# sumado sobre las cuatro patas, donde F es la norma de net_forces_w del pie EN EL PASO DEL PRIMER
+# CONTACTO. Es exactamente la cantidad que eval.py promedia para reportar `impact_force_mean`, o
+# sea que optimizarlo mueve la metrica que se puntua.
+#
+# ELECCION DE PARAMETROS:
+# - threshold = 50 N: por debajo de la media de la baseline (74 N), asi que hay gradiente desde el
+#   primer momento del entrenamiento, pero por encima del apoyo estatico del peso propio, asi que
+#   caminar normal no se castiga. Solo se cobra el EXCESO, no la fuerza entera.
+# - weight = -0.01: con un exceso tipico de ~50 N por pisada, aporta ~-0.5 en el paso del apoyo,
+#   el mismo orden que los terminos de tarea (track_lin_vel pesa 1.5 sobre un valor ~1). Empezar
+#   mas fuerte arriesga que el robot deje de pisar para no pagar (el minimo local de quedarse
+#   quieto, que el gate de locomocion de score.py detecta pero conviene no rozar).
+# - AISLADO sobre el campeon: es un termino nuevo, hay que medir su efecto solo antes de combinarlo.
+#
+# QUE VIGILAR: que baje impact_force_mean sin romper la rodilla (0.0984 m) ni el despeje del pie, y
+# que no reaparezcan caidas (el campeon tiene CERO).
+env:
+  rewards:
+    foot_impact:
+      weight: -0.01
+      params:
+        threshold: 50.0

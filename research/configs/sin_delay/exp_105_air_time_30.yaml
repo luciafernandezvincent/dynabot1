@@ -1,0 +1,27 @@
+# exp_105 — recuperar la zancada larga que exp_104 volvio a perder.
+#
+# BASE: champion.yaml = exp_104 (joint_deviation -0.2 + feet_air_time 1.5 + gait 5.0, score 0.5674)
+#
+# Patron repetido en toda la tanda: cada vez que se le agrega una restriccion nueva a la marcha, la
+# politica recupera la velocidad comandada pisando MAS SEGUIDO en vez de dando pasos mas largos.
+#   baseline                       2.98 Hz / paso 0.245 m
+#   exp_102 (+joint_deviation)     3.75 Hz / paso 0.195 m   <- se acelero
+#   exp_103 (+feet_air_time 1.5)   2.81 Hz / paso 0.260 m   <- se corrigio
+#   exp_104 (+gait)                3.59 Hz / paso 0.203 m   <- se volvio a acelerar
+#
+# El usuario pidio explicitamente lo contrario ("se mueven muy rapido algunos"), y el lever que ya
+# demostro corregirlo es el mismo: subir el peso de feet_air_time. Se repite la jugada de exp_103
+# (que gano +0.0095) ahora que `gait` movio el punto de operacion, duplicando el peso: 1.5 -> 3.0.
+#
+# El valor 3.0 no es arbitrario: es el de exp_022_airtime_max (historico sin delay), que dio la
+# zancada mas baja medida hasta ahora (2.46 Hz) con despeje de pie de 34.5 mm. Aca ademas hay un
+# `gait` sosteniendo la simetria que en aquel experimento no existia.
+#
+# QUE VIGILAR: el impacto ya subio a 100.8 N en exp_104 (baseline 74.0) y vuelos mas largos hacen
+# caer el pie desde mas alto. La restriccion dura esta en 250 N, pero el termino impact del score
+# ya es el mas bajo del campeon (norm 0.426). Si el impacto se dispara sin ganar zancada, la via
+# esta agotada y el proximo paso seria bajar el peso de gait en vez de subir el de air_time.
+env:
+  rewards:
+    feet_air_time:
+      weight: 3.0

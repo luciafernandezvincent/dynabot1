@@ -1,0 +1,36 @@
+# exp_104 — forzar simetria entre patas: sincronizar las diagonales (trote real).
+#
+# BASE: champion.yaml = exp_103 (joint_deviation -0.2 + feet_air_time 1.5, score 0.5587)
+#
+# Estado del problema despues de exp_103: la altura minima de la rodilla yendo hacia atras dejo de
+# ser un problema general y quedo concentrada en UNA sola pata.
+#
+#   front_right_arm_link  0.0613 m   <-- la unica baja
+#   back_right_arm_link   0.2286 m
+#   back_left_arm_link    0.2349 m
+#   front_left_arm_link   0.2509 m
+#
+# Como score.py puntua el PEOR caso, esa unica pata se come todo el termino knee_clearance (0.12
+# del score) aunque las otras tres esten 4x mas arriba. Y ningun termino que actue igual sobre las
+# cuatro patas va a arreglarlo: `knee_clearance` suma las cuatro antes de la exponencial (una pata
+# alta "paga" por la baja, ver exp_101), y `feet_air_time` ya emparejo las frecuencias (2.73-2.90
+# Hz) sin emparejar las alturas.
+#
+# `GaitReward` (peso 0 por defecto, adaptado de la config de Spot) es el unico termino disponible
+# que impone estructura ENTRE patas: penaliza la diferencia de timing de contacto entre los pares
+# diagonales (front_left+back_right vs front_right+back_left), forzando que las diagonales pisen
+# juntas y que un par este en el aire mientras el otro apoya. Si front_right tiene que copiar el
+# timing de back_left --que hoy vuela alto-- no le queda margen para su patron rasante propio.
+#
+# El peso 5.0 es el que uso exp_010_trot_gait (sin delay, historico): dio una marcha de trote real
+# con despeje de pie alto (38.6 mm). Su costo conocido fue el impacto (82.7 N), que aca ya viene
+# alto de exp_103 (82.5 N): es la metrica a vigilar, y si sube demasiado el proximo paso es bajar
+# el peso o compensar por otro lado.
+#
+# Alternativa descartada para este turno: `air_time_variance` (penaliza que unas patas vuelen mas
+# que otras). Se probo dos veces en la tanda anterior contra la misma clase de asimetria (exp_042 y
+# exp_058, delay5) y en ninguna de las dos la resolvio. Queda como plan B.
+env:
+  rewards:
+    gait:
+      weight: 5.0

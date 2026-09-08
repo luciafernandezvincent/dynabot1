@@ -308,6 +308,23 @@ class RewardsCfg:
         },
     )
 
+    # peso 0 por defecto: no cambia la baseline, queda disponible para tunear via YAML. Pedido del
+    # usuario (08/09/2026) mirando el video: que no pise tan fuerte. Penaliza el EXCESO de fuerza
+    # de contacto por encima de `threshold` en el instante del apoyo, que es la misma cantidad que
+    # eval.py reporta como `impact_force_mean` (norma de net_forces_w en el primer contacto).
+    # Motivo: en la tanda sin_delay el impacto subio de 74 N (baseline) a 100.8 N en el campeon
+    # exp_104, y es el termino mas bajo del score (norm 0.426) ademas de un costo real de hardware.
+    # threshold=50 N esta por debajo de la media de la baseline (74 N), asi que la señal existe
+    # desde el principio del entrenamiento sin castigar el apoyo normal del peso propio.
+    foot_impact = RewTerm(
+        func=mdp.foot_impact_penalty,
+        weight=0.0,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*hand_link"),
+            "threshold": 50.0,
+        },
+    )
+
     foot_clearance = RewTerm(
         func=mdp.foot_clearance_reward,
         weight=0.0,

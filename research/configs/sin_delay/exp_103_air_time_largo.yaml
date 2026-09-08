@@ -1,0 +1,25 @@
+# exp_103 — bajar la frecuencia de zancada: premiar el tiempo de vuelo.
+#
+# BASE: champion.yaml = exp_102 (joint_deviation -0.2, score 0.5491)
+#
+# exp_102 gano por postura (joint_deviation_mean 0.1414 -> 0.0519), rodilla (0.0559 -> 0.0594) y
+# caidas (0.0150 -> 0.0040), pero EMPEORO la marcha: la zancada paso de 2.98 a 3.75 Hz y el largo
+# de paso de 0.245 a 0.195 m. O sea, pasitos mas cortos y apurados. Eso es exactamente lo que
+# marco el usuario mirando el video ("se mueven muy rapido algunos") y ademas explica por que el
+# despeje del pie cayo de 19.0 a 12.4 mm: no hay tiempo de vuelo para levantar la pata.
+#
+# `feet_air_time` premia (tiempo de vuelo - threshold) por pata cuando hay comando de velocidad.
+# Con weight 0.5 (el default) el premio por volar mas tiempo es chico frente al costo de mantener
+# la pose. Subirlo a 1.5 (x3) hace que estirar el vuelo pague, lo que alarga la zancada y baja la
+# frecuencia. El threshold se deja en el default 0.5 s: la tanda anterior mostro que BAJARLO
+# acelera la marcha (exp_002/030 con threshold 0.12 y 0.08 dieron 5.6 Hz), que es lo contrario de
+# lo que se busca aca.
+#
+# Referencia historica del efecto de subir el peso: exp_022_airtime_max (w=3.0) dio 2.46 Hz y
+# exp_026_airtime_5 (w=5.0) dio 2.00 Hz, ambos con despeje de pie alto (34-38 mm). Se elige 1.5 y
+# no 3.0 para no pasarse de largo en un solo paso: el riesgo de un peso muy alto es que el robot
+# vuele demasiado y pierda seguimiento de velocidad o estabilidad.
+env:
+  rewards:
+    feet_air_time:
+      weight: 1.5

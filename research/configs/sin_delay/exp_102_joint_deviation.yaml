@@ -1,0 +1,25 @@
+# exp_102 — atacar la CAUSA FISICA del codo bajo: la pata plegada.
+#
+# exp_101 mostro que empujar la altura de la rodilla con el reward que la mide directamente no
+# funciona: `knee_clearance` con min_height=0.11 y std=0.005 esta saturado en el punto de
+# operacion real (rodilla ~0.05 m) y no tiene gradiente util — la rodilla EMPEORO 31%
+# (0.0559 -> 0.0388) mientras subia el despeje del pie, que es donde el termino si tenia pendiente.
+#
+# Otro angulo: el codo pasa cerca del piso porque la pata trabaja MUY FLEXIONADA respecto de su
+# pose default (joint_deviation_mean_rad = 0.1414 en la baseline). `joint_deviation_l1` penaliza
+# justamente esa distancia a la default, y ataca la causa en vez del sintoma. Evidencia de la
+# tanda anterior (delay5): aislado con w=-0.2 (exp_016) subio knee_height_min_backward_m de
+# 0.0493 a 0.0614 (+25%), el mayor salto de un factor aislado en toda esa tanda.
+#
+# Ademas es el termino que el usuario pidio por el lado del hardware: cerca de la pose default el
+# actuador hace mejor fuerza, asi que una postura mas recta no solo levanta el codo sino que
+# reduce el torque exigido al servo.
+#
+# Se usa w=-0.2 (el valor con medicion directa sobre la rodilla), no -0.05 ni -0.5: con -0.05
+# (exp_015) el efecto fue chico, y con -0.5 (exp_017) la marcha se volvio de pasitos cortos y
+# rasantes (despeje 40.6 -> 10.3 mm, zancada 2.56 -> 4.54 Hz). Riesgo conocido a vigilar: que
+# achique el paso y baje foot_clearance.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2

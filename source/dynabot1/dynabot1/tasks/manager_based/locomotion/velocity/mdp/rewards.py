@@ -33,6 +33,36 @@ def feet_air_time(
     return reward
 
 
+def foot_impact_penalty(
+    env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, threshold: float
+) -> torch.Tensor:
+    """Penaliza pisar fuerte: la fuerza de contacto del pie EN EL INSTANTE del apoyo (touchdown).
+
+    Pedido del usuario (08/09/2026): "que no haga movimientos con mucha fuerza en la pisada". Hasta
+    ahora ningun reward miraba la fuerza de contacto -- `undesired_contacts` solo cuenta contactos
+    del arm_link, y `dof_torques_l2` mide el torque de los actuadores, que no es lo mismo que el
+    golpe contra el piso.
+
+    Se mide igual que el juez: `eval.py` calcula `impact_force_mean` como la norma de
+    `net_forces_w` sobre los pies en los pasos donde `compute_first_contact` es verdadero. Esta
+    penalizacion usa exactamente esa cantidad, asi que optimizarla mueve la metrica que se puntua.
+
+    Forma: solo se cobra el EXCESO por encima de `threshold` (`clamp(F - threshold, min=0)`), asi
+    que apoyar suave no cuesta nada y el gradiente aparece unicamente cuando la pisada es dura. Es
+    lineal y no cuadratica a proposito: con fuerzas de ~100 N un termino cuadratico daria valores
+    de 1e4 que aplastarian al resto de los rewards.
+
+    Devuelve la suma sobre las cuatro patas, en newtons. Se usa con peso NEGATIVO y chico
+    (del orden de -0.005 a -0.02): con un exceso tipico de ~50 N por pisada, -0.01 aporta -0.5 en
+    el paso del apoyo, comparable a los terminos de tarea.
+    """
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    first_contact = contact_sensor.compute_first_contact(env.step_dt)[:, sensor_cfg.body_ids]
+    forces = torch.norm(contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids, :], dim=-1)
+    excess = torch.clamp(forces - threshold, min=0.0)
+    return torch.sum(excess * first_contact.float(), dim=1)
+
+
 def foot_clearance_reward(
     env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, target_height: float, std: float, tanh_mult: float
 ) -> torch.Tensor:

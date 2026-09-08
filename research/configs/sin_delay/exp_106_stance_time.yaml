@@ -1,0 +1,35 @@
+# exp_106 — bajar el impacto y emparejar las patas con un tiempo de apoyo objetivo.
+#
+# BASE: champion.yaml = exp_104 (joint_deviation -0.2 + feet_air_time 1.5 + gait 5.0, score 0.5674)
+#
+# Dos cosas que dejaron claras los experimentos previos:
+#
+# 1. El termino mas lejos de su optimo en el campeon es el IMPACTO: norm 0.426, el mas bajo de los
+#    ocho, con impact_force_mean = 100.8 N contra 74.0 N de la baseline. No es solo score: es un
+#    costo real de hardware, del mismo tipo que el que motivo toda la tanda.
+# 2. Subir mas el tiempo de VUELO ya no rinde: exp_105 (feet_air_time 3.0) consiguio la marcha mas
+#    lenta pero subio el impacto a 109 N, hundio la rodilla hacia adelante (0.1148 -> 0.0759 m) e
+#    hizo que el codo volviera a tocar. Esa via esta agotada.
+#
+# `stance_time` (peso 0 por defecto) ataca desde el lado opuesto: en vez de premiar mas vuelo,
+# premia que el tiempo de APOYO de cada pata se acerque a un objetivo (exp(-error^2/std), acotado
+# en (0,1]). Mas tiempo en el piso por paso = aterrizajes menos violentos y, sobre todo, un valor
+# OBJETIVO comun para las cuatro patas, que es presion directa hacia la uniformidad que pidio el
+# usuario (a diferencia de air_time_variance, que solo castiga la dispersion y fallo dos veces en
+# la tanda anterior: exp_042 y exp_058).
+#
+# Los parametros son los calibrados en la tanda anterior: target_contact_time = 0.15 s, std = 0.01,
+# weight = 0.5 (exp_059_stance_time_delay5). Ahi ese reward aislado dio el mejor
+# knee_height_min_backward_m de toda esa tanda (0.0859 contra 0.0493 de su baseline), aunque con
+# mas caidas; aca se apila sobre un campeon que tiene CERO caidas y `gait` sosteniendo la simetria,
+# asi que el riesgo de ese efecto secundario es menor.
+#
+# QUE VIGILAR: que no rompa el trote que impuso `gait` (los dos actuan sobre el timing de contacto)
+# ni baje la rodilla, que es la metrica que motivo la tanda.
+env:
+  rewards:
+    stance_time:
+      weight: 0.5
+      params:
+        target_contact_time: 0.15
+        std: 0.01

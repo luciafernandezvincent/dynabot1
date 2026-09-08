@@ -1,0 +1,11 @@
+# CAMPEON VIGENTE de la tanda sin_delay: exp_104_gait_simetria (score 0.5674).
+# Historia: baseline 0.5173 -> exp_102 joint_deviation 0.5491 -> exp_103 +feet_air_time 0.5587
+# -> exp_104 +gait 0.5674 (rodilla atras 55.9 -> 98.4 mm, cero caidas).
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    feet_air_time:
+      weight: 1.5
+    gait:
+      weight: 5.0

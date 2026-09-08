@@ -33,21 +33,39 @@ from score import format_breakdown, score_results  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RESEARCH_DIR = REPO_ROOT / "research"
-RESULTS_JSONL = RESEARCH_DIR / "results.jsonl"
-RESULTS_MD = RESEARCH_DIR / "RESULTS.md"
-RUNS_DIR = RESEARCH_DIR / "runs"
+
+# --------------------------------------------------------------------------------------
+# VARIANTE de la tanda (08/09/2026, pedido del usuario). Todo lo que la corrida guarda queda
+# bajo una subcarpeta con este nombre, para que la tanda nueva no se mezcle con las anteriores:
+#
+#   research/configs/<VARIANT>/     <- los YAML de cada experimento
+#   research/runs/<VARIANT>/        <- logs del runner, config resuelto, video, explicacion
+#   research/runs/<VARIANT>/results.jsonl y RESULTS.md   <- registro y tabla de ESTA tanda
+#   logs/rsl_rl/anymal_d_flat/<VARIANT>/  <- checkpoints, params y eval de Isaac Lab
+#
+# "sin_delay" porque estos experimentos corren con ACTION_DELAY = 1 (sin retardo de accion), a
+# diferencia de la tanda anterior que corrio con delay 5. Para volver al layout viejo (todo
+# plano bajo research/ y logs/rsl_rl/anymal_d_flat/), poner VARIANT = "".
+# --------------------------------------------------------------------------------------
+VARIANT = "sin_delay"
+
+RESULTS_JSONL = RESEARCH_DIR / "runs" / VARIANT / "results.jsonl"
+RESULTS_MD = RESEARCH_DIR / "runs" / VARIANT / "RESULTS.md"
+RUNS_DIR = RESEARCH_DIR / "runs" / VARIANT
+CONFIGS_DIR = RESEARCH_DIR / "configs" / VARIANT
 
 # --------------------------------------------------------------------------------------
 # Protocolo fijo. No cambiar entre experimentos: si cambia, los scores dejan de ser comparables.
 # --------------------------------------------------------------------------------------
 TASK = "Dyna1-Flat-v0"
-EXPERIMENT_NAME = "anymal_d_flat"  # carpeta bajo logs/rsl_rl (viene del PPORunnerCfg)
+EXPERIMENT_NAME = f"anymal_d_flat/{VARIANT}" if VARIANT else "anymal_d_flat"
+# carpeta bajo logs/rsl_rl (viene del PPORunnerCfg; el runner la fuerza en el YAML resuelto)
 TRAIN_ITERATIONS = 1500
 TRAIN_NUM_ENVS = 4096
 SEED = 42
 EVAL_NUM_ENVS = 1000
 EVAL_NUM_STEPS = 1000
-ACTION_DELAY = 5
+ACTION_DELAY = 1
 VIDEO_NUM_ENVS = 10  # perros en pantalla
 VIDEO_LENGTH_STEPS = 300  # 300 pasos * 0.02 s de step_dt = 6 s de video
 VIDEO_TIMEOUT_S = 900
@@ -118,6 +136,84 @@ def resolve_config(config: dict, iterations: int, seed: int, out_path: Path) -> 
     with open(out_path, "w") as f:
         yaml.safe_dump(resolved, f, sort_keys=False)
     return out_path
+
+
+def write_hyperparams(run_dir: Path, name: str, config: dict, args, base: Path | None, delta: Path | None) -> Path:
+    """Deja en el dir del experimento un YAML legible con TODOS los hiperparametros de la corrida.
+
+    `config.resolved.yaml` es lo que consume train_delay.py; este archivo es el registro para el
+    humano: protocolo (presupuesto, semilla, delay), de que base se partio, cual fue el delta de
+    ESTE experimento y la config efectiva completa que resulto.
+    """
+    document = {
+        "experimento": name,
+        "variante": VARIANT,
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "protocolo": {
+            "task": TASK,
+            "iterations": args.iterations,
+            "num_envs": args.num_envs,
+            "seed": args.seed,
+            "eval_num_envs": EVAL_NUM_ENVS,
+            "eval_num_steps": EVAL_NUM_STEPS,
+            "action_delay": ACTION_DELAY,
+        "variant": VARIANT,
+            "experiment_name": EXPERIMENT_NAME,
+        },
+        "base": str(base.relative_to(REPO_ROOT)) if base else None,
+        "delta_de_este_experimento": load_yaml(delta) if delta else {},
+        "hiperparametros_efectivos": config,
+    }
+    run_dir.mkdir(parents=True, exist_ok=True)
+    out_path = run_dir / "hiperparametros.yaml"
+    with open(out_path, "w") as f:
+        yaml.safe_dump(document, f, sort_keys=False, allow_unicode=True)
+    return out_path
+
+
+def augment_hyperparams_from_log(hyperparams_path: Path, log_dir: Path) -> None:
+    """Agrega al YAML de hiperparametros los valores EFECTIVOS que dumpeo train_delay.py.
+
+    El delta de un experimento solo dice que cambio; para leer despues "con que se entreno esto"
+    hace falta la config completa que uso Isaac Lab (`<log_dir>/params/env.yaml` y `agent.yaml`).
+    Se copian solo los pesos/params escalares de cada reward y los hiperparametros de PPO: el
+    env.yaml entero (escena, sensores, actuadores) no aporta nada porque la fisica no se toca.
+    """
+    env_yaml = log_dir / "params" / "env.yaml"
+    agent_yaml = log_dir / "params" / "agent.yaml"
+    if not hyperparams_path.exists() or not env_yaml.exists():
+        return
+
+    def scalar_only(value):
+        return value if isinstance(value, (int, float, str, bool, type(None))) else str(type(value).__name__)
+
+    try:
+        env_cfg = yaml.unsafe_load(env_yaml.read_text())
+        rewards = {}
+        for term, cfg in (env_cfg.get("rewards") or {}).items():
+            if cfg is None:
+                rewards[term] = None
+                continue
+            entry = {"weight": cfg.get("weight")}
+            params = {k: scalar_only(v) for k, v in (cfg.get("params") or {}).items()}
+            if params:
+                entry["params"] = params
+            rewards[term] = entry
+        effective = {"env": {"episode_length_s": env_cfg.get("episode_length_s"), "rewards": rewards}}
+        if agent_yaml.exists():
+            agent_cfg = yaml.unsafe_load(agent_yaml.read_text())
+            effective["agent"] = {
+                key: agent_cfg.get(key)
+                for key in ("num_steps_per_env", "max_iterations", "seed", "experiment_name", "algorithm", "policy",
+                            "actor", "critic", "empirical_normalization")
+                if agent_cfg.get(key) is not None
+            }
+        document = yaml.safe_load(hyperparams_path.read_text()) or {}
+        document["hiperparametros_efectivos_del_entrenamiento"] = json.loads(json.dumps(effective, default=str))
+        with open(hyperparams_path, "w") as f:
+            yaml.safe_dump(document, f, sort_keys=False, allow_unicode=True)
+    except Exception as error:  # nunca romper el experimento por el registro
+        print(f"[WARN] No se pudo anexar la config efectiva a {hyperparams_path}: {error}")
 
 
 def run_command(cmd: list[str], log_path: Path, timeout: int) -> tuple[int, str]:
@@ -211,27 +307,37 @@ def write_results_table() -> None:
     done.sort(key=lambda r: r["score"], reverse=True)
 
     lines = [
-        "# Resultados de autoresearch - Dyna1",
+        f"# Resultados de autoresearch - Dyna1 ({VARIANT or 'raiz'})",
         "",
         "Generado por `research/run_experiment.py`. No editar a mano: se reescribe en cada experimento.",
+        "",
+        f"Tanda `{VARIANT}`: action_delay = {ACTION_DELAY} (1 = sin retardo de accion). Los checkpoints "
+        f"viven en `logs/rsl_rl/{EXPERIMENT_NAME}/` y los artefactos del runner en `research/runs/{VARIANT}/`.",
         "",
         f"Protocolo: `{TASK}`, {TRAIN_ITERATIONS} iters x {TRAIN_NUM_ENVS} envs, seed {SEED}, "
         f"eval {EVAL_NUM_ENVS} envs x {EVAL_NUM_STEPS} pasos.",
         "",
-        "| # | experimento | score | despeje mm | vel_track | ori_estab | ori_suav | mov_suav | impacto N | caidas/ep | zancada Hz | duty | notas |",
-        "|---|-------------|-------|------------|-----------|-----------|----------|----------|-----------|-----------|------------|------|-------|",
+        "| # | experimento | score | rodilla atras mm | rodilla adel mm | despeje mm | vel_track | ori_estab | ori_suav | "
+        "mov_suav | impacto N | caidas/ep | zancada Hz | duty | notas |",
+        "|---|-------------|-------|------------------|-----------------|------------|-----------|-----------|----------|"
+        "----------|-----------|-----------|------------|------|-------|",
     ]
     for rank, r in enumerate(done, start=1):
         m = r.get("metrics", {})
         stride = m.get("stride_frequency_hz_mean", m.get("movement_frequency_hz"))
         flag = "" if r.get("valid", True) else " ⚠"
+        def _mm(value):
+            return f"{value * 1000:.1f}" if isinstance(value, (int, float)) else "-"
+
         lines.append(
-            "| {rank} | {name} | {score:.4f}{flag} | {clearance} | {vel:.3f} | {stab:.3f} | {smooth:.3f} | {mov:.3f} | "
-            "{impact:.1f} | {falls:.3f} | {stride} | {duty} | {notes} |".format(
+            "| {rank} | {name} | {score:.4f}{flag} | {knee_back} | {knee_fwd} | {clearance} | {vel:.3f} | {stab:.3f} | "
+            "{smooth:.3f} | {mov:.3f} | {impact:.1f} | {falls:.3f} | {stride} | {duty} | {notes} |".format(
                 rank=rank,
                 name=r["name"],
                 score=r["score"],
                 flag=flag,
+                knee_back=_mm(m.get("knee_height_min_backward_m")),
+                knee_fwd=_mm(m.get("knee_height_min_forward_m")),
                 clearance=(f"{m['foot_clearance_peak_m'] * 1000:.1f}"
                            if m.get("foot_clearance_peak_m") is not None else "-"),
                 vel=m.get("velocity_tracking_accuracy_0to1", float("nan")),
@@ -401,6 +507,8 @@ def main() -> int:
     run_dir = RUNS_DIR / name
     log_dir = REPO_ROOT / "logs" / "rsl_rl" / EXPERIMENT_NAME / name
     resolved_path = resolve_config(config, args.iterations, args.seed, run_dir / "config.resolved.yaml")
+    hyperparams_path = write_hyperparams(run_dir, name, config, args, args.base, args.config)
+    print(f"[INFO] Hiperparametros del experimento: {hyperparams_path}")
 
     train_cmd = [
         sys.executable, "scripts/rsl_rl/train_delay.py",
@@ -443,6 +551,7 @@ def main() -> int:
         "seed": args.seed,
         "action_delay": ACTION_DELAY,
         "judge_hashes": judge_hashes(),
+        "variant": VARIANT,
     }
 
     started = time.time()
@@ -456,6 +565,7 @@ def main() -> int:
             print(f"[ERROR] Entrenamiento fallido (rc={returncode}). Ultimas lineas:\n{tail}", file=sys.stderr)
             return 1
     record["train_seconds"] = round(time.time() - started, 1)
+    augment_hyperparams_from_log(hyperparams_path, log_dir)
 
     eval_started = time.time()
     returncode, tail = run_command(eval_cmd, run_dir / "eval.log", EVAL_TIMEOUT_S)

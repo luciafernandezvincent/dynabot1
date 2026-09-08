@@ -1,0 +1,22 @@
+# exp_101 — ataque directo al problema reportado por el usuario.
+#
+# Medido en baseline_sin_delay: knee_height_min_backward_m = 0.0559 m. O sea que yendo hacia
+# atras el segmento medio de la pata baja a 5.6 cm del piso (peor pata: front_right_arm_link,
+# 0.0559 m; la mejor, back_left_arm_link, 0.1856 m: la asimetria es de 3.3x).
+#
+# knee_clearance es el unico reward que mide directamente esa altura (exp(-violacion^2/std),
+# pesado por la velocidad horizontal del segmento). Esta en peso 0 por defecto. Se activa AISLADO
+# —ningun otro cambio— para medir cuanto da por si solo antes de combinarlo con nada.
+#
+# Los valores vienen de la calibracion de la tanda anterior (delay5): min_height=0.11 es el
+# objetivo pedido por el usuario; std=0.005 fue el unico std que hizo al termino sensible
+# (exp_038 con std=0.05 daba exp(...)~1.0 siempre y no movio la aguja, exp_039 con 0.005 si);
+# weight=0.5 es el valor con el que knee_clearance entro en los mejores combos (exp_040/046/053).
+env:
+  rewards:
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.11
+        std: 0.005
+        tanh_mult: 2.0
