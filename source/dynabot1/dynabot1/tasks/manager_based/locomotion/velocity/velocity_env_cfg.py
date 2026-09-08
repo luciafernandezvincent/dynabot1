@@ -136,7 +136,7 @@ class ObservationsCfg:
         #base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
         
         projected_gravity =  ObsTerm(
-            func=mdp.base_ang_vel,
+            func=mdp.projected_gravity,
             noise=Gnoise(mean=0.2003, std=0.0023),
         )
         #projected_gravity = ObsTerm(func=mdp.projected_gravity,noise=Gnoise(mean=0.0, std=0.048))

@@ -60,15 +60,16 @@ Protocolo: `Dyna1-Flat-v0`, 1500 iters x 4096 envs, seed 42, eval 1000 envs x 10
 | 52 | exp_061_stance_time_std02_delay5 | 0.5079 | 19.9 | 0.937 | 0.996 | 0.084 | 0.983 | 66.2 | 0.008 | 5.08 | 0.43 | [delay5, tanda2, 5/20] stance_time std 0.01->0.02, weight de vuelta a 0.5 (bajar el peso en exp_060 perdio el efecto en knee_height) |
 | 53 | exp_031_airtime_020_delay5 | 0.5068 | 33.2 | 0.943 | 0.991 | 0.086 | 0.981 | 59.4 | 0.008 | 5.33 | 0.45 | [delay5, adaptativo] barrido: feet_air_time.threshold 0.12->0.20 aislado, confirmar si 0.12 es pico local (0.08 en exp_030 salio peor) |
 | 54 | exp_038_knee_clearance_reward_delay5 | 0.5062 | 28.9 | 0.929 | 0.993 | 0.083 | 0.981 | 70.6 | 0.004 | 4.85 | 0.40 | [delay5, adaptativo, 5/20] knee_clearance rediseñado (exp(-x/std) acotado, patron foot_clearance_reward), w=0.5 |
-| 55 | exp_036_knee_clearance_delay5 | 0.5032 | 29.5 | 0.945 | 0.993 | 0.091 | 0.981 | 72.7 | 0.007 | 4.65 | 0.41 | [delay5, adaptativo, 3/20] reward nuevo knee_clearance w=-5.0 min_height=0.11, aislado, ataca directo el gateo para atras |
-| 56 | exp_051_combo_orientation_soft_delay5 | 0.5032 | 16.7 | 0.958 | 0.995 | 0.102 | 0.983 | 73.1 | 0.008 | 4.85 | 0.40 | [delay5, adaptativo, 18/20] combo exp_046 + flat_orientation_l2 -5.0->-1.0 (mas libertad de inclinar el cuerpo) |
-| 57 | exp_037_knee_clearance_050_delay5 | 0.4897 | 31.3 | 0.936 | 0.992 | 0.083 | 0.981 | 67.0 | 0.011 | 4.89 | 0.41 | [delay5, adaptativo, 4/20] barrido: knee_clearance w=-5.0->-50.0 (exp_036 con -5.0 no tuvo efecto medible) |
-| 58 | exp_001_clearance_on_delay5 | 0.4823 | 38.9 | 0.890 | 0.986 | 0.067 | 0.980 | 58.9 | 0.011 | 4.14 | 0.46 | [delay5, replica de exp_001_clearance_on] activar foot_clearance w=0.5 target 5cm |
-| 59 | exp_041_knee_backward_gated_delay5 | 0.4820 | 41.3 | 0.903 | 0.990 | 0.066 | 0.981 | 57.2 | 0.012 | 4.92 | 0.48 | [delay5, adaptativo, 8/20] knee_clearance v3: filtro por direccion del comando (solo para atras) en vez de por velocidad del segmento, mismo weight/std que exp_039 |
-| 60 | baseline_ar | 0.4790 | 22.9 | 0.972 | 0.989 | 0.117 | 0.987 | 74.8 | 0.023 | 3.07 | 0.47 | baseline de referencia, defaults del codigo |
-| 61 | exp_044_combo_seed123_delay5 | 0.4761 | 29.6 | 0.920 | 0.992 | 0.086 | 0.982 | 60.4 | 0.022 | 5.20 | 0.46 | [delay5, adaptativo, 11/20] exp_040 EXACTO con semilla distinta (123), para saber si la asimetria de pata es ruido de entrenamiento (reintento, el primero fallo por config desincronizado) |
-| 62 | exp_002_airtime_threshold_fix | 0.4459 | 23.9 | 0.971 | 0.988 | 0.108 | 0.986 | 65.4 | 0.036 | 3.96 | 0.50 | CAUSA RAIZ: threshold 0.5->0.12s aislado vs baseline (sin clearance) |
-| 63 | smoke_revert | 0.0000 ⚠ | 8.7 | 0.257 | 1.000 | 0.633 | 1.000 | 5.3 | 0.000 | 0.89 | 0.98 |  |
+| 55 | exp_062_new | 0.5059 | 20.2 | 0.939 | 0.994 | 0.084 | 0.983 | 63.6 | 0.005 | 5.01 | 0.45 | [delay5, tanda2, 6/20] stance_time target 0.15->0.12 (menos ambicioso), weight/std de exp_059 |
+| 56 | exp_036_knee_clearance_delay5 | 0.5032 | 29.5 | 0.945 | 0.993 | 0.091 | 0.981 | 72.7 | 0.007 | 4.65 | 0.41 | [delay5, adaptativo, 3/20] reward nuevo knee_clearance w=-5.0 min_height=0.11, aislado, ataca directo el gateo para atras |
+| 57 | exp_051_combo_orientation_soft_delay5 | 0.5032 | 16.7 | 0.958 | 0.995 | 0.102 | 0.983 | 73.1 | 0.008 | 4.85 | 0.40 | [delay5, adaptativo, 18/20] combo exp_046 + flat_orientation_l2 -5.0->-1.0 (mas libertad de inclinar el cuerpo) |
+| 58 | exp_037_knee_clearance_050_delay5 | 0.4897 | 31.3 | 0.936 | 0.992 | 0.083 | 0.981 | 67.0 | 0.011 | 4.89 | 0.41 | [delay5, adaptativo, 4/20] barrido: knee_clearance w=-5.0->-50.0 (exp_036 con -5.0 no tuvo efecto medible) |
+| 59 | exp_001_clearance_on_delay5 | 0.4823 | 38.9 | 0.890 | 0.986 | 0.067 | 0.980 | 58.9 | 0.011 | 4.14 | 0.46 | [delay5, replica de exp_001_clearance_on] activar foot_clearance w=0.5 target 5cm |
+| 60 | exp_041_knee_backward_gated_delay5 | 0.4820 | 41.3 | 0.903 | 0.990 | 0.066 | 0.981 | 57.2 | 0.012 | 4.92 | 0.48 | [delay5, adaptativo, 8/20] knee_clearance v3: filtro por direccion del comando (solo para atras) en vez de por velocidad del segmento, mismo weight/std que exp_039 |
+| 61 | baseline_ar | 0.4790 | 22.9 | 0.972 | 0.989 | 0.117 | 0.987 | 74.8 | 0.023 | 3.07 | 0.47 | baseline de referencia, defaults del codigo |
+| 62 | exp_044_combo_seed123_delay5 | 0.4761 | 29.6 | 0.920 | 0.992 | 0.086 | 0.982 | 60.4 | 0.022 | 5.20 | 0.46 | [delay5, adaptativo, 11/20] exp_040 EXACTO con semilla distinta (123), para saber si la asimetria de pata es ruido de entrenamiento (reintento, el primero fallo por config desincronizado) |
+| 63 | exp_002_airtime_threshold_fix | 0.4459 | 23.9 | 0.971 | 0.988 | 0.108 | 0.986 | 65.4 | 0.036 | 3.96 | 0.50 | CAUSA RAIZ: threshold 0.5->0.12s aislado vs baseline (sin clearance) |
+| 64 | smoke_revert | 0.0000 ⚠ | 8.7 | 0.257 | 1.000 | 0.633 | 1.000 | 5.3 | 0.000 | 0.89 | 0.98 |  |
 
 ## Experimentos fallidos
 
