@@ -1,0 +1,32 @@
+# exp_109 — quedarse con lo mejor de los dos: zancada larga Y pisada suave.
+#
+# BASE: champion.yaml = exp_107 (joint_deviation -0.2 + feet_air_time 1.5 + gait 5.0
+#                                + foot_impact -0.01)
+# CAMBIOS: feet_air_time 1.5 -> 2.25 (la config de exp_108)
+#          foot_impact  -0.01 -> -0.02 (el doble de peso al reward nuevo)
+#
+# Estado despues de exp_108. Hay dos configs muy cerca en score pero distintas en caracter:
+#
+#                          exp_107 (campeon)   exp_108
+#   score                       0.5751          0.5722
+#   rodilla atras               0.0947 m        0.1055 m   <- exp_108 gana (objetivo del usuario)
+#   zancada                     3.18 Hz         2.64 Hz    <- exp_108 gana (objetivo del usuario)
+#   paso                        0.231 m         0.277 m    <- exp_108 gana
+#   impacto                     69.4 N          78.1 N     <- exp_107 gana
+#
+# O sea: la zancada larga de exp_108 cuesta 8.7 N de impacto, y ese es todo el motivo por el que
+# pierde el score. La hipotesis de este experimento es que ese costo se puede pagar subiendo el
+# peso del termino que justamente lo controla, en vez de renunciar a la zancada larga.
+#
+# Se dobla el peso (-0.01 -> -0.02) y no mas, por dos razones: -0.01 ya demostro ser suficiente
+# para bajar el impacto un 31% (exp_107), y un peso muy alto arriesga que la politica deje de
+# pisar para no pagar (el minimo local de quedarse quieto que vigila el gate de score.py).
+#
+# QUE VIGILAR: que el impacto vuelva al orden de 70 N SIN perder la rodilla (0.1055 m) ni la
+# zancada (2.64 Hz), y que sigan en cero las caidas.
+env:
+  rewards:
+    feet_air_time:
+      weight: 2.25
+    foot_impact:
+      weight: -0.02

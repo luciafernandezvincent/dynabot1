@@ -1,0 +1,25 @@
+# exp_110 — cerrar el trade-off: el punto medio entre rodilla alta y pisada suave.
+#
+# BASE: champion.yaml = exp_109 (joint_deviation -0.2 + feet_air_time 2.25 + gait 5.0
+#                                + foot_impact -0.02, score 0.5781)
+# CAMBIO (unico): foot_impact.weight -0.02 -> -0.015
+#
+# Los dos ultimos experimentos midieron el mismo trade-off con la misma marcha (feet_air_time 2.25,
+# gait 5.0, joint_deviation -0.2), variando solo el peso del reward nuevo:
+#
+#   foot_impact   rodilla atras   impacto     score
+#   -0.010        0.1055 m        78.1 N      0.5722   (exp_108)
+#   -0.020        0.0771 m        60.8 N      0.5781   (exp_109)
+#
+# La relacion es monotona y clara: mas castigo al impacto = pisada mas suave pero rodilla mas baja,
+# porque la forma barata de aterrizar suave es caer desde menos altura con la pierna mas plegada.
+# El punto medio (-0.015) deberia dar rodilla ~0.09 m con impacto ~68 N: la rodilla de exp_107 con
+# la marcha lenta de exp_108/109 y un impacto por debajo de la baseline.
+#
+# Es el ultimo experimento de la tanda, asi que se elige el barrido que cierra el compromiso entre
+# los dos objetivos que pidio el usuario (codo alto + pisada suave) en vez de abrir una via nueva
+# que quedaria sin seguimiento.
+env:
+  rewards:
+    foot_impact:
+      weight: -0.015

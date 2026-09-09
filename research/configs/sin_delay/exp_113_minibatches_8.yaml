@@ -1,0 +1,24 @@
+# exp_113 — seguir explotando PPO: mas pasos de gradiente por epoca.
+#
+# BASE: champion.yaml = exp_112 (los 4 rewards + num_learning_epochs 8, score 0.5887)
+# CAMBIO (unico): agent.algorithm.num_mini_batches 4 -> 8
+#
+# exp_112 mostro que la via de optimizacion rinde donde los rewards ya se estorban entre si:
+# +0.0085 de score mejorando SIETE de los ocho terminos a la vez, sin sacrificar ninguno.
+# Quedan perillas del mismo optimizador sin tocar, y esta es la complementaria directa.
+#
+# `num_mini_batches` (4 por defecto) es en cuantos pedazos se parte cada lote para actualizar. Con
+# 4096 envs x 24 pasos = 98304 muestras, pasar de 4 a 8 da minibatches de 12288 en vez de 24576:
+# el doble de pasos de gradiente por epoca, cada uno con una estimacion mas ruidosa. Junto con las
+# 8 epocas de exp_112, multiplica por 2 las actualizaciones sobre los mismos datos.
+#
+# Referencia: en la tanda anterior se probo (exp_063_stance_time_minibatches, delay5) pero sobre
+# una config distinta y junto con otro cambio, asi que no quedo una medicion limpia del factor. Aca
+# va aislado y sobre un campeon que ya demostro responder bien a mas pasos de gradiente.
+#
+# QUE VIGILAR: el riesgo de esta via es el sobreajuste al lote — gradientes mas ruidosos pueden
+# desestabilizar la politica. Los indicadores son las caidas (hoy en CERO) y el seguimiento de
+# velocidad. Si se desestabiliza, la conclusion es que exp_112 ya estaba en el optimo de esta via.
+agent:
+  algorithm:
+    num_mini_batches: 8

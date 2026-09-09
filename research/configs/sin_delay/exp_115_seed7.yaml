@@ -1,0 +1,24 @@
+# exp_115 — VERIFICACION: el campeon exacto con otra semilla.
+#
+# BASE: champion.yaml = exp_112 (4 rewards + num_learning_epochs 8, score 0.5887)
+# CAMBIO: NINGUNO en la config. Solo la semilla del entrenamiento: 42 -> 7 (via --seed del runner).
+#
+# POR QUE CERRAR ASI, Y NO CON UN CAMBIO MAS
+# ------------------------------------------
+# El espacio esta bastante recorrido: los rewards nuevos ya solo producen intercambios entre
+# objetivos (exp_111 empato, exp_108/109/110 midieron el compromiso rodilla-vs-impacto), las dos
+# perillas principales de PPO estan medidas (exp_112 gano fuerte, exp_113 no) y la capacidad de la
+# red esta descartada (exp_114). Un experimento mas del mismo tipo agregaria poca informacion.
+#
+# Lo que SI falta es saber cuanta confianza merecen los numeros. Varios resultados de esta tanda se
+# movieron en el orden de +-0.003 (exp_111: -0.0003; exp_110: +0.0021; exp_109: +0.0030), y la
+# ganancia de exp_112 fue +0.0085. Si al cambiar la semilla el score se mueve tanto como esas
+# diferencias, entonces buena parte del ranking de la tabla es ruido de entrenamiento y no un
+# efecto de las configs. Si en cambio se sostiene, el campeon es solido y las conclusiones tambien.
+#
+# Es la misma practica que se uso en la tanda anterior (exp_044 con semilla 123, exp_052 y exp_056
+# con semilla 7), y ahi resulto informativa: exp_044 revelo que exp_040 variaba mucho con la
+# semilla, algo que no se hubiera visto de otro modo.
+#
+# El resto del protocolo no se toca: mismas 1500 iteraciones x 4096 envs, mismo eval de 1000 envs
+# x 1000 pasos, mismo juez.

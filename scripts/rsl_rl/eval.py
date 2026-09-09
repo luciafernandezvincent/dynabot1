@@ -32,6 +32,17 @@ parser.add_argument(
 parser.add_argument("--action-delay", type=int, default=1, help="Number of steps to delay actions (1 = no delay)")
 parser.add_argument("--num_steps", type=int, default=1000, help="Number of simulation steps to run the evaluation for.")
 parser.add_argument(
+    "--torque_legs", type=str, default="front_left,back_left",
+    help=(
+        "Patas cuyos torques se guardan en torques.csv, separadas por coma "
+        "(front_left, front_right, back_left, back_right). Vacio ('') desactiva el CSV."
+    ),
+)
+parser.add_argument(
+    "--torque_env", type=int, default=0,
+    help="Indice del entorno cuyos torques se guardan en torques.csv (el eval corre muchos en paralelo).",
+)
+parser.add_argument(
     "--experiment_config", type=str, default=None,
     help=(
         "Path to the SAME YAML used to train the checkpoint being evaluated. Necesario cuando el "
@@ -65,6 +76,7 @@ installed_version = metadata.version("rsl-rl-lib")
 
 """Rest everything follows."""
 
+import csv
 import json
 import os
 
@@ -172,6 +184,55 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
     if state["joint_positions"] is None:
         state["joint_positions"] = []
     state["joint_positions"].append(joint_pos)
+
+    # Saturacion del motor sobre TODAS las articulaciones (no solo las dos patas del CSV).
+    # En DCMotorCfg el techo de par no es fijo: es la curva par-velocidad, asi que el actuador
+    # esta saturado exactamente cuando recorta el pedido del PD, o sea applied != computed.
+    computed_torque = articulation.data.computed_torque
+    applied_torque = articulation.data.applied_torque
+    saturated = (computed_torque - applied_torque).abs() > 1e-4
+    state["torque_sat_steps"] += saturated.sum(dim=0).float().detach().cpu().numpy()
+    state["torque_abs_sum"] += applied_torque.abs().mean(dim=0).detach().cpu().numpy()
+    applied_abs_max = applied_torque.abs().max(dim=0).values.detach().cpu().numpy()
+    state["torque_abs_max"] = (
+        applied_abs_max if state["torque_abs_max"] is None else np.maximum(state["torque_abs_max"], applied_abs_max)
+    )
+    state["torque_steps"] += 1
+
+    # torque por articulacion de las patas pedidas, para exportar a CSV. Se guardan las dos series:
+    # applied_torque (lo que el actuador realmente entrega) y computed_torque (el pedido crudo del
+    # PD): donde se separan, el motor esta saturado, y el valor de applied es el techo en ese instante.
+    if state["torque_joint_ids"] is None and args_cli.torque_legs.strip():
+        legs = [leg.strip() for leg in args_cli.torque_legs.split(",") if leg.strip()]
+        try:
+            # el nombre de la pata va EN EL MEDIO en la articulacion de abduccion
+            # (base_to_front_left_shoulder), asi que anclar el patron al inicio con f"{leg}_.*" la
+            # perdia en silencio: matcheaba las otras dos de la pata y por eso no daba error.
+            ids, names = articulation.find_joints([f".*{leg}.*" for leg in legs], preserve_order=True)
+        except ValueError as exc:
+            # una pata mal escrita no debe tirar abajo el eval entero: se avisa y se sigue sin CSV
+            print(f"[WARN] --torque_legs='{args_cli.torque_legs}' no matchea articulaciones ({exc}). Sin torques.csv.")
+            ids, names = [], []
+        # se listan los nombres resueltos para que un match incompleto se vea, en vez de aparecer
+        # como columnas faltantes recien al abrir el CSV
+        print(f"[INFO] Torques a CSV para {len(names)} articulaciones: {names}")
+        if args_cli.torque_env >= env.unwrapped.num_envs:
+            print(
+                f"[WARN] --torque_env={args_cli.torque_env} fuera de rango ({env.unwrapped.num_envs} envs)."
+                " Sin torques.csv."
+            )
+            ids, names = [], []
+        state["torque_joint_ids"] = ids
+        state["torque_joint_names"] = names
+        state["torque_rows"] = []
+    if state["torque_joint_ids"]:
+        ids = state["torque_joint_ids"]
+        row_applied = applied_torque[args_cli.torque_env, ids].detach().cpu().numpy().tolist()
+        row_computed = computed_torque[args_cli.torque_env, ids].detach().cpu().numpy().tolist()
+        row_sat = saturated[args_cli.torque_env, ids].detach().cpu().numpy().astype(int).tolist()
+        state["torque_rows"].append(
+            [step, (step + 1) * env.unwrapped.step_dt] + row_applied + row_computed + row_sat
+        )
 
     # Record base position and orientation for path tracking and stability
     root_state = articulation.data.root_state_w  # (num_envs, 13)
@@ -475,6 +536,22 @@ def compute_results(env, state: dict) -> dict:
         else 0.0
     )
 
+    # Saturacion de los actuadores: fraccion de muestras (env x step x joint) en las que el modelo
+    # de motor tuvo que recortar el par pedido por el PD. Alta saturacion = la politica pide mas par
+    # del que el motor real puede dar, asi que la marcha no se transfiere al hardware.
+    torque_sat_rate = 0.0
+    torque_sat_per_joint = {}
+    torque_mean_per_joint = {}
+    torque_max_per_joint = {}
+    if state["torque_steps"] > 0 and state["joint_names"]:
+        samples_per_joint = state["torque_steps"] * env.unwrapped.num_envs
+        sat_per_joint = state["torque_sat_steps"] / samples_per_joint
+        mean_per_joint = state["torque_abs_sum"] / state["torque_steps"]
+        torque_sat_rate = float(np.mean(sat_per_joint))
+        torque_sat_per_joint = {n: float(v) for n, v in zip(state["joint_names"], sat_per_joint)}
+        torque_mean_per_joint = {n: float(v) for n, v in zip(state["joint_names"], mean_per_joint)}
+        torque_max_per_joint = {n: float(v) for n, v in zip(state["joint_names"], state["torque_abs_max"])}
+
     # Calculate velocity tracking
     velocity_tracking = (
         compute_velocity_tracking_accuracy(state["cmd_vels"], state["actual_vels"]) if state["cmd_vels"] else 0.0
@@ -512,6 +589,10 @@ def compute_results(env, state: dict) -> dict:
             {n: float(v) for n, v in zip(state["joint_names"], state["joint_dev_per_joint_sum"] / state["joint_dev_steps"])}
             if state["joint_dev_steps"] > 0 and state["joint_names"] else {}
         ),
+        "torque_saturation_rate": torque_sat_rate,
+        "torque_saturation_rate_per_joint": torque_sat_per_joint,
+        "torque_applied_abs_mean_per_joint_Nm": torque_mean_per_joint,
+        "torque_applied_abs_max_per_joint_Nm": torque_max_per_joint,
         "elbow_contact_rate": (
             state["arm_contact_steps"] / (env.unwrapped.num_envs * args_cli.num_steps * max(1, len(state["arm_names"] or [])))
             if state["arm_names"] else 0.0
@@ -537,6 +618,26 @@ def compute_results(env, state: dict) -> dict:
         "orientation_smoothness_0to1": orientation_smoothness,
         "velocity_tracking_accuracy_0to1": velocity_tracking,
     }
+
+
+def save_torques_csv(state: dict, out_dir: str):
+    if not state["torque_rows"]:
+        return
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "torques.csv")
+    with open(out_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        names = state["torque_joint_names"]
+        writer.writerow(
+            ["step", "time_s"]
+            # applied = par entregado; computed = par pedido por el PD; saturated = 1 cuando el
+            # actuador recorto (applied != computed), es decir el motor esta contra su techo.
+            + [f"{name}_applied_Nm" for name in names]
+            + [f"{name}_computed_Nm" for name in names]
+            + [f"{name}_saturated" for name in names]
+        )
+        writer.writerows(state["torque_rows"])
+    print(f"[INFO] Saved joint torques (env {args_cli.torque_env}) to: {out_path}")
 
 
 def save_results(results: dict, out_dir: str):
@@ -639,6 +740,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "arm_contact_force_sum": 0.0,
         "arm_contact_force_max": 0.0,
         "joint_names": None,
+        "torque_joint_ids": None,
+        "torque_joint_names": None,
+        "torque_rows": None,
+        "torque_sat_steps": 0.0,
+        "torque_abs_sum": 0.0,
+        "torque_abs_max": None,
+        "torque_steps": 0,
         "joint_dev_sum": 0.0,
         "joint_dev_per_joint_sum": 0.0,
         "joint_dev_steps": 0,
@@ -674,6 +782,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     results = compute_results(env, state)
     print_dict(results)
     save_results(results, os.path.join(log_dir, "eval"))
+    save_torques_csv(state, os.path.join(log_dir, "eval"))
 
     # close the simulator
     env.close()

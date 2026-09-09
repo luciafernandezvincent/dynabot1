@@ -1,0 +1,39 @@
+# exp_111 — levantar el PIE, que es el termino mas debil del campeon.
+#
+# BASE: champion.yaml = exp_110 (joint_deviation -0.2 + feet_air_time 2.25 + gait 5.0
+#                                + foot_impact -0.015, score 0.5802)
+#
+# Desglose del campeon, ordenado por lo lejos que esta cada termino de su optimo:
+#   foot_clearance          norm=0.370   <- EL MAS BAJO de los ocho, con peso 0.13
+#   velocity_tracking       norm=0.499   (peso 0.30, el mas pesado)
+#   movement_smoothness     norm=0.503
+#   impact                  norm=0.525
+#   orientation_smoothness  norm=0.560
+#   knee_clearance          norm=0.628
+#   orientation_stability   norm=0.878
+#   gait                    norm=1.000   (saturado)
+#
+# El despeje del PIE es lo unico que empeoro respecto de la baseline en toda la tanda:
+# foot_clearance_peak_m 0.0190 -> 0.0135 m (-29%) y el despeje MEDIO quedo negativo (-0.0036 m),
+# o sea que el pie roza el piso durante el swing. Tiene sentido: `joint_deviation` mantiene la
+# pata cerca de la pose default y `foot_impact` premia aterrizar sin altura, y ninguno de los
+# terminos activos mira la altura del pie.
+#
+# `foot_clearance` (peso 0 por defecto) es justamente el reward que la mide: exp(-error/std)
+# pesado por la velocidad horizontal del pie, con target_height sobre el piso. OJO: es un reward
+# distinto en forma al `knee_clearance` que fallo en exp_101 — aquel penalizaba una violacion
+# elevada al cuadrado y quedaba saturado en el punto de operacion; este premia acercarse a una
+# altura objetivo y tiene gradiente util alrededor de ella.
+#
+# Parametros: weight 0.5 y target_height 0.05 m son los de exp_001_clearance_on, el experimento con
+# mejor score de la primera tanda sin delay (0.5837 con el juez viejo), donde subio el despeje pico
+# de 22.9 a 40.6 mm. std=0.05 y tanh_mult=2.0 son los defaults del termino.
+#
+# QUE VIGILAR: que no rompa lo ganado. El riesgo es que levantar el pie suba el impacto (cae desde
+# mas alto) — pero `foot_impact` esta activo justamente para contener eso — o que baje la rodilla.
+env:
+  rewards:
+    foot_clearance:
+      weight: 0.5
+      params:
+        target_height: 0.05

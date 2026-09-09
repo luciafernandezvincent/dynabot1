@@ -101,8 +101,8 @@ DYNABOT_1_CFG = ArticulationCfg(
         actuators={
         "shoulder": DCMotorCfg(
             joint_names_expr=[".*_shoulder"],
-            effort_limit=14.5,
-            saturation_effort=20.5,
+            effort_limit=9.0,
+            saturation_effort=9.0,
             velocity_limit=21.0,
             stiffness=90.0,
             damping=5.5,
@@ -111,8 +111,8 @@ DYNABOT_1_CFG = ArticulationCfg(
         ),
         "shoulder_to_arm": DCMotorCfg(
             joint_names_expr=[".*shoulder_to_arm"],
-            effort_limit=14.5,
-            saturation_effort=20.5,
+            effort_limit=9.0,
+            saturation_effort=9.0,
             velocity_limit=21.0,
             stiffness=28,  # Aumentamos para que empiece a moverse más rápido
             damping=1.85,     # Aumentamos más que la rigidez para frenar el "pasarse"
@@ -121,8 +121,8 @@ DYNABOT_1_CFG = ArticulationCfg(
         ),
         "arm_to_hand": DCMotorCfg(
             joint_names_expr=[".*arm_to_hand"],
-            effort_limit=14.5,
-            saturation_effort=20.5,
+            effort_limit=9.0,
+            saturation_effort=9.0,
             velocity_limit=21.0,
             stiffness=100.0,
             damping=3.5,

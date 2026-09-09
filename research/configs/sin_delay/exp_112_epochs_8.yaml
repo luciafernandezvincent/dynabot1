@@ -1,0 +1,27 @@
+# exp_112 — cambiar de via: hiperparametros de PPO, no rewards.
+#
+# BASE: champion.yaml = exp_110 (score 0.5802)
+# CAMBIO (unico): agent.algorithm.num_learning_epochs 5 -> 8
+#
+# POR QUE. Los ultimos experimentos chocaron contra intercambios entre objetivos: exp_109 bajo el
+# impacto a costa de la rodilla, exp_111 subio el despeje del pie a costa de la rodilla. Todos los
+# terminos de reward disponibles ya estan tironeando entre si, asi que sumar otro no promete mucho.
+#
+# Los hiperparametros de PPO son la unica via de esta tanda que NO implica un intercambio: un
+# entrenamiento mas estable produce una politica mejor en TODOS los terminos a la vez, sin tener
+# que sacrificar uno por otro. En las 11 corridas de esta tanda no se toco ni uno solo
+# (`agent.algorithm.*` esta permitido por el runner, pero todo el esfuerzo fue a rewards).
+#
+# `num_learning_epochs` (5 por defecto) es cuantas pasadas de gradiente hace PPO sobre cada lote de
+# experiencia. Subirlo aprovecha mejor cada rollout, a riesgo de sobreajustar el lote y desestabilizar
+# la politica. Evidencia directa: en la tanda anterior (delay5), pasar de 5 a 8 fue el salto de score
+# MAS GRANDE de esa tanda (exp_053_combo_epochs: 0.5375 -> 0.5467, +0.009) y mejoro simultaneamente
+# rodilla, seguimiento de velocidad y caidas. El barrido posterior acoto el optimo: 10 salio peor
+# (exp_054: 0.5342) y 6 tambien (exp_055: 0.5195), asi que 8 es el valor a replicar, no un punto de
+# partida a explorar.
+#
+# QUE VIGILAR: inestabilidad de entrenamiento (caidas, que hoy estan en CERO) y que no se rompa
+# ninguno de los cuatro terminos ya ganados.
+agent:
+  algorithm:
+    num_learning_epochs: 8

@@ -1,0 +1,27 @@
+# exp_114 — mas capacidad en la red, ahora que el optimizador aprovecha mejor los datos.
+#
+# BASE: champion.yaml = exp_112 (4 rewards + num_learning_epochs 8, score 0.5887)
+# CAMBIO (unico): actor y critic hidden_dims [128,128,128] -> [256,256,128]
+#
+# POR QUE AHORA. La red de 128x128x128 viene desde la baseline y nunca se toco en esta tanda. En la
+# tanda anterior (delay5) se probo agrandarla y no rindio (exp_034: 0.5115 contra 0.5188 de su
+# baseline), pero ahi la red grande tenia que aprender con `num_learning_epochs` = 5, o sea con la
+# mitad del provecho por lote. exp_112 acaba de mostrar que este problema RESPONDE a exprimir mas
+# cada lote (+0.0085 con 8 epocas): mas capacidad tiene sentido justamente cuando el optimizador
+# ya esta aprovechando bien los datos, no antes.
+#
+# La politica tiene que resolver simultaneamente cuatro objetivos que compiten entre si (postura,
+# zancada larga, trote sincronizado, pisada suave) — los ultimos experimentos chocaron una y otra
+# vez con esos intercambios. Parte de ese muro puede ser falta de capacidad para representar una
+# marcha que satisfaga a todos a la vez, no un limite fisico del robot.
+#
+# [256,256,128] duplica las dos primeras capas y deja la tercera: ~4x parametros en la primera capa
+# y ~2x en total, un salto moderado. La VRAM no es problema (medido: ~4.3 GB de 16.3 en uso).
+#
+# QUE VIGILAR: sobreajuste — una red mas grande con el mismo presupuesto de 1500 iteraciones puede
+# quedar peor entrenada. Los indicadores son el seguimiento de velocidad y las caidas (hoy en CERO).
+agent:
+  actor:
+    hidden_dims: [256, 256, 128]
+  critic:
+    hidden_dims: [256, 256, 128]

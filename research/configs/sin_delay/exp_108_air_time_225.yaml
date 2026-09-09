@@ -1,0 +1,25 @@
+# exp_108 — reintentar la zancada larga, ahora con la pisada protegida.
+#
+# BASE: champion.yaml = exp_107 (joint_deviation -0.2 + feet_air_time 1.5 + gait 5.0
+#                                + foot_impact -0.01, score 0.5751)
+#
+# exp_105 ya habia probado alargar la zancada subiendo `feet_air_time` de 1.5 a 3.0. Consiguio la
+# marcha mas lenta de toda la tanda (2.59 Hz, paso 0.278 m, exactamente lo que pidio el usuario)
+# pero se descarto porque el precio fue el impacto: 109 N, el peor valor medido, mas la rodilla
+# hacia adelante hundida y el codo volviendo a tocar.
+#
+# Ese precio ahora tiene quien lo cobre: `foot_impact` (exp_107) bajo el impacto a 69.4 N — por
+# debajo incluso de la baseline (74.0) — y de paso ya empujo la marcha en la direccion correcta
+# sola (3.59 -> 3.18 Hz). O sea que la razon por la que exp_105 fracaso esta directamente
+# controlada.
+#
+# Se elige 2.25 y no 3.0: exp_103 (1.5) gano y exp_105 (3.0) perdio, asi que el optimo esta entre
+# los dos, y 2.25 es el punto medio. Con el paso de 0.231 m del campeon actual y la tendencia
+# medida, deberia caer alrededor de 2.8-3.0 Hz con paso ~0.26 m.
+#
+# QUE VIGILAR: el impacto (que foot_impact deberia contener), la rodilla hacia adelante — que en
+# exp_105 fue lo que mas se hundio (0.1148 -> 0.0759 m) — y que no reaparezcan caidas.
+env:
+  rewards:
+    feet_air_time:
+      weight: 2.25
