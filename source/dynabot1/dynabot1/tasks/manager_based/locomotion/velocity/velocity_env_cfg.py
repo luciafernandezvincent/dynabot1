@@ -143,7 +143,8 @@ class ObservationsCfg:
         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Gnoise(mean=0.0, std=0.1))
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Gnoise(mean=0.0,std=0.1))
-        actions = ObsTerm(func=mdp.last_action)
+        # last 4 applied actions (4 x 12 = 48 dims), to compensate for the action delay
+        actions = ObsTerm(func=mdp.last_action, history_length=4, flatten_history_dim=True)
 
         # height_scan = ObsTerm(
         #    func=mdp.height_scan,
