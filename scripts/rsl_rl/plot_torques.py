@@ -22,7 +22,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 
-DEFAULT_CSV = "logs/rsl_rl/anymal_d_flat/sin_delay/exp_112_epochs_8/eval/torques.csv"
+DEFAULT_CSV = "logs/rsl_rl/anymal_d_flat/sin_delay/exp_122_combo_action_rate_saturation/eval/torques.csv"
 
 #: Linea horizontal de referencia, en Nm. NO es lo que usa la simulacion: los DCMotorCfg de
 #: source/dynabot1/dynabot1/assets/dynabot.py tienen effort_limit=14.5, asi que la columna

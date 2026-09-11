@@ -1,0 +1,21 @@
+# exp_212_lento_postura — base: exp_211_lento_epochs8 (marcha lenta 3.38 Hz, rodilla adelante 109 mm)
+#
+# Defecto restante: front_right hacia atras (66 mm). Es la pata debil CRONICA de la tanda: en
+# todos los experimentos desde exp_203 va a la mitad de altura que las otras tres al retroceder.
+# `joint_deviation` ataca la causa fisica (pata plegada lejos de la pose default) y fue lo que
+# primero levanto la rodilla en la tanda (exp_201: +19%). A diferencia de `knee_clearance`
+# (exp_210, descartado), penaliza cada articulacion por separado, asi que la senal le llega a
+# la pata plegada y no a las demas. Se duplica: -0.2 -> -0.4.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.4
+    gait:
+      weight: 2.5
+    feet_air_time:
+      weight: 4.0
+    action_rate_l2:
+      weight: -0.3
+agent:
+  algorithm:
+    num_learning_epochs: 8

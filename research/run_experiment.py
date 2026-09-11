@@ -47,7 +47,7 @@ RESEARCH_DIR = REPO_ROOT / "research"
 # diferencia de la tanda anterior que corrio con delay 5. Para volver al layout viejo (todo
 # plano bajo research/ y logs/rsl_rl/anymal_d_flat/), poner VARIANT = "".
 # --------------------------------------------------------------------------------------
-VARIANT = "sin_delay"
+VARIANT = "delay_bien"
 
 RESULTS_JSONL = RESEARCH_DIR / "runs" / VARIANT / "results.jsonl"
 RESULTS_MD = RESEARCH_DIR / "runs" / VARIANT / "RESULTS.md"
@@ -65,7 +65,7 @@ TRAIN_NUM_ENVS = 4096
 SEED = 42
 EVAL_NUM_ENVS = 1000
 EVAL_NUM_STEPS = 1000
-ACTION_DELAY = 1
+ACTION_DELAY = 5
 VIDEO_NUM_ENVS = 10  # perros en pantalla
 VIDEO_LENGTH_STEPS = 300  # 300 pasos * 0.02 s de step_dt = 6 s de video
 VIDEO_TIMEOUT_S = 900

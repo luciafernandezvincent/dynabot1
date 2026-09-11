@@ -1,0 +1,24 @@
+# exp_204_foot_impact — base: exp_203_gait_airtime (campeon, 0.5511)
+#
+# exp_203 dejo un solo frente abierto: el impacto de la pisada subio a 87.6 N (era 70.9 en la
+# baseline y 74.5 en exp_202). Es la contracara directa de `feet_air_time`: mas vuelo por paso,
+# mas energia en el aterrizaje. En el score, `impact` quedo en norm 0.461 con peso 0.09.
+#
+# `foot_impact` (reward agregado en la tanda anterior a pedido del usuario) penaliza el exceso
+# de fuerza SOLO en el instante del primer contacto y SOLO por encima de un umbral, asi que no
+# castiga el apoyo sostenido ni la marcha en general: le pone un techo al golpe.
+# Peso -0.015 con umbral 50 N, calibrado en sin_delay/exp_112, donde bajo el impacto 31% y
+# ademas permitio ALARGAR la zancada -- lo que aca conviene, porque el paso sigue corto
+# (157 mm) respecto de exp_201 (183 mm).
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 5.0
+    feet_air_time:
+      weight: 2.0
+    foot_impact:
+      weight: -0.015
+      params:
+        threshold: 50.0

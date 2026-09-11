@@ -1,0 +1,16 @@
+# exp_209_combo_gait_bajo — base: exp_208_combo_lento
+#
+# Ataca la CAUSA del pisoteo. Desde exp_202 se sabe que `gait` 5.0 premia el contacto
+# sincronizado y que con delay 5 la politica lo cobra pisando mas seguido (3.99 -> 5.20 Hz).
+# Todo lo que vino despues (feet_air_time, action_rate) compensa ese empuje; aca se lo reduce
+# a la mitad para ver si la simetria ya aprendida se sostiene con menos presion.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 2.5
+    feet_air_time:
+      weight: 4.0
+    action_rate_l2:
+      weight: -0.3

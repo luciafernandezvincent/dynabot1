@@ -1,0 +1,20 @@
+# exp_213_lento_gait_medio — base: exp_211_lento_epochs8
+#
+# Busca el punto intermedio de `gait` entre los dos extremos medidos:
+#   gait 5.0 (exp_207/208): rodilla atras 116-119 mm, pero 3.97-4.13 Hz
+#   gait 2.5 (exp_209/211): 3.38-3.46 Hz, pero rodilla atras 66-94 mm
+# 3.5 apuesta a conservar la mayor parte de la lentitud recuperando algo de la coordinacion que
+# sostiene a front_right al retroceder.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 3.5
+    feet_air_time:
+      weight: 4.0
+    action_rate_l2:
+      weight: -0.3
+agent:
+  algorithm:
+    num_learning_epochs: 8

@@ -1,0 +1,20 @@
+# exp_215_airtime_6 — base: exp_213_lento_gait_medio (campeon de marcha)
+#
+# Busca mas lentitud por la otra palanca, dejando gait en 3.5 (coordinacion sana).
+# feet_air_time castiga cada pisada (vuelos de ~0.14 s contra threshold 0.5 s), asi que mas
+# peso = menos pasos. 2.0 -> 4.0 bajo la zancada de 4.51 a 4.13 Hz (exp_203 -> exp_206). Se sube
+# a 6.0. Riesgo conocido (exp_208): apilar penalizaciones fuertes llevo a una pata baja; aca la
+# base tiene gait 3.5 y PPO 8 epochs, que en exp_213 sostuvieron las 8 rodillas.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 3.5
+    feet_air_time:
+      weight: 6.0
+    action_rate_l2:
+      weight: -0.3
+agent:
+  algorithm:
+    num_learning_epochs: 8

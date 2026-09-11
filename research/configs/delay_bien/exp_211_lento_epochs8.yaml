@@ -1,0 +1,20 @@
+# exp_211_lento_epochs8 — base: exp_209_combo_gait_bajo (la marcha mas lenta y suave: 3.46 Hz)
+#
+# Ataque alternativo a la pata que se hunde en exp_209, sin agregar ningun reward.
+# Hipotesis: la pata rezagada es un OPTIMO LOCAL (aparecio en 204, 205, 208 y 209, siempre del
+# mismo tipo: una pata apoya baja mientras las otras tres van altas). PPO con mas epochs por
+# iteracion optimiza mejor cada lote y en las dos tandas anteriores fue el unico cambio que
+# mejoro todos los terminos a la vez (sin_delay/exp_112: 7 de 8 terminos; tambien gano en delay5).
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 2.5
+    feet_air_time:
+      weight: 4.0
+    action_rate_l2:
+      weight: -0.3
+agent:
+  algorithm:
+    num_learning_epochs: 8

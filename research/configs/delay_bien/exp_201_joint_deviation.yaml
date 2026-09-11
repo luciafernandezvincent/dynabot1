@@ -1,0 +1,35 @@
+# exp_201 — atacar la causa fisica de la rodilla baja: la pata plegada.
+#
+# BASE: baseline_delay_bien (defaults del codigo, score 0.5225)
+# CAMBIO (unico): env.rewards.joint_deviation.weight 0.0 -> -0.2
+#
+# DIAGNOSTICO DE LA BASELINE (delay 5, actuadores 9 Nm):
+#   knee_height_min_backward_m = 0.0549 m   <- el problema que motiva la tanda
+#   por pata (atras): front_right 0.0549 | front_left 0.0628 | back_left 0.1021 | back_right 0.2141
+#     -> asimetria de 3.9x: dos patas gatean y una va alta
+#   joint_deviation_mean_rad   = 0.1426     <- camina MUY flexionado
+#   torque_saturation_rate     = 0.0455, y por junta: arm_to_hand 12-14% en tres de las cuatro patas
+#   stride_frequency           = 4.19 Hz, step_length 0.174 m  -> pasitos cortos y apurados
+#   elbow_contact_force_mean   = 56.6 N     <- el codo efectivamente toca
+#
+# POR QUE ESTE CAMBIO PRIMERO. `joint_deviation_l1` penaliza alejarse de la pose default, que es
+# exactamente la causa fisica de que el arm_link quede cerca del piso: la pata trabaja plegada.
+# Tiene evidencia en las dos tandas anteriores como el factor aislado que mas movio la rodilla
+# (delay5 exp_016: 0.0493 -> 0.0614, +25%; sin_delay exp_102: 0.0559 -> 0.0594 con la asimetria
+# cayendo de 3.3x a 2.0x y las caidas -73%).
+#
+# Y en ESTE regimen tiene un segundo motivo que antes no existia: con el techo de 9 Nm la junta
+# `arm_to_hand` satura el 14% del tiempo. Cerca de la pose default el brazo de palanca es mejor y
+# el mismo trabajo cuesta menos par, asi que enderezar la postura deberia bajar tambien la
+# saturacion. Es el unico lever del catalogo que ataca los dos problemas a la vez.
+#
+# Se usa -0.2 (el valor con medicion directa sobre la rodilla en las dos tandas) y no -0.05
+# (efecto chico, exp_015) ni -0.5 (marcha de pasitos rasantes, exp_017).
+#
+# QUE VIGILAR: el compromiso conocido de este termino es que ACHICA EL PASO. La baseline ya viene
+# con la zancada disparada (4.19 Hz), asi que si eso empeora hay que corregirlo despues con
+# feet_air_time, que es lo que funciono en sin_delay (exp_103).
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2

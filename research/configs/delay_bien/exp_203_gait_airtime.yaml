@@ -1,0 +1,19 @@
+# exp_203_gait_airtime — base: exp_202_gait, que a su vez viene de exp_201
+#
+# exp_202 dejo el diagnostico servido: `gait` 5.0 subio la rodilla de atras 67% (65 -> 109 mm)
+# pero cobro la sincronia de la forma barata -- pisando mas seguido (3.99 -> 5.20 Hz) y mas
+# corto (183 -> 137 mm). Esa marcha apurada es la que se llevo el score: seguimiento de
+# velocidad 0.965 -> 0.927 y suavidad de orientacion 0.129 -> 0.089.
+#
+# `feet_air_time` premia el tiempo de VUELO por paso, o sea empuja exactamente en la direccion
+# contraria: menos pasos, mas largos. Sube de 0.5 (default) a 2.0. En sin_delay/exp_106 el
+# mismo termino a 2.25 alargo la zancada sin romper nada; aca se usa un poco mas conservador
+# porque con delay 5 y 9 Nm el vuelo largo pide picos de torque.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 5.0
+    feet_air_time:
+      weight: 2.0

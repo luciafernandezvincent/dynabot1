@@ -1,0 +1,18 @@
+# exp_214_gait_3 — base: exp_213_lento_gait_medio (campeon de marcha: 3.55 Hz, 8 rodillas >114 mm)
+#
+# Curva de gait medida: 2.5 -> 3.38 Hz con alguna pata baja; 3.5 -> 3.55 Hz con todas las
+# rodillas altas. Se prueba 3.0 para ubicar donde se rompe la coordinacion y si hay mas lentitud
+# disponible antes de ese punto.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 3.0
+    feet_air_time:
+      weight: 4.0
+    action_rate_l2:
+      weight: -0.3
+agent:
+  algorithm:
+    num_learning_epochs: 8
