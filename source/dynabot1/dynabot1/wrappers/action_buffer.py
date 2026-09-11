@@ -20,7 +20,7 @@ class ActionDelayWrapper:
         # etc.
     """
 
-    def __init__(self, env, delay_steps: int = 1, default_action="zeros"):
+    def __init__(self, env, delay_steps: int = 1, default_action="zeros", action_history_length: int | None = None):
         """
         Initialize action delay wrapper.
 
@@ -30,6 +30,12 @@ class ActionDelayWrapper:
             default_action: What to send before first actions arrive
                 - "zeros": Send zero action
                 - "hold": Hold last action (requires first action to initialize)
+            action_history_length: Number of most recent *raw* (not-yet-executed) actions to
+                write into the trailing slot of obs["policy"] that mdp.last_action reserves
+                (must match the history_length of the `actions` ObsTerm in the env cfg).
+                Defaults to delay_steps - 1, the actual number of actions still pending in
+                the queue at any given time (the one at the front is the one being executed
+                this step, so it doesn't count as "pending").
         """
         self.env = env
         self.delay_steps = max(1, delay_steps)
@@ -37,6 +43,9 @@ class ActionDelayWrapper:
         self.action_queue = deque(maxlen=delay_steps)
         self.last_action = None
         self.step_count = 0
+        self.action_history_length = (
+            action_history_length if action_history_length is not None else max(self.delay_steps - 1, 0)
+        )
 
         # Expose common environment attributes
         if hasattr(env, 'observation_space'):
@@ -52,7 +61,9 @@ class ActionDelayWrapper:
         """Reset environment and clear action queue."""
         self.action_queue.clear()
         self.last_action = None
-        return self.env.reset(seed=seed, options=options)
+        obs, info = self.env.reset(seed=seed, options=options)
+        obs = self._fix_action_history_obs(obs)
+        return obs, info
 
     def step(self, actions):
         """
@@ -89,6 +100,10 @@ class ActionDelayWrapper:
         # Step environment with delayed action
         obs, reward, done, truncated, info = self.env.step(action_to_execute)
 
+        # replace mdp.last_action's history (executed/delayed actions) with the raw
+        # actions still pending, so the obs stays a Markov state under the delay
+        obs = self._fix_action_history_obs(obs)
+
         # Store delayed action info in info dict for logging
         if "delayed_action" not in info:
             info["delayed_action"] = action_to_execute
@@ -99,6 +114,33 @@ class ActionDelayWrapper:
         # Log delay information periodically
         self.step_count += 1
         return obs, reward, done, truncated, info
+
+    def _fix_action_history_obs(self, obs):
+        """Overwrite the trailing action-history slot of obs["policy"] with raw actions.
+
+        mdp.last_action(history_length=N) fills that slot with the N most recent actions
+        that reached env.action_manager -- but since this wrapper delays actions before
+        they get there, that's the N most recent *executed* actions, not the ones the
+        policy just committed and are still sitting in the queue. Replace it with the
+        latter, taken straight from action_queue (oldest first), zero-padded until the
+        queue fills up.
+        """
+        if not isinstance(obs, dict) or "policy" not in obs or not isinstance(obs["policy"], torch.Tensor):
+            return obs
+        if not self.action_queue:
+            return obs
+
+        n = self.action_history_length
+        history = list(self.action_queue)[-n:]
+        if len(history) < n:
+            pad = [torch.zeros_like(history[0])] * (n - len(history))
+            history = pad + history
+
+        raw_hist = torch.cat(history, dim=-1)
+        slice_len = raw_hist.shape[-1]
+        policy_obs = obs["policy"]
+        obs["policy"] = torch.cat([policy_obs[..., :-slice_len], raw_hist], dim=-1)
+        return obs
 
     def _create_zero_action(self, action_template):
         """Create zero action with same shape as template."""
