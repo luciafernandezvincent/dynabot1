@@ -1,0 +1,18 @@
+# exp_206_airtime_fuerte — base: exp_203_gait_airtime (campeon, 0.5511)
+#
+# Pedido del usuario: las patas se mueven muy rapido y la caminata tiene que ser mas suave.
+# El campeon va a 4.51 Hz con paso de 157 mm; el campeon de la tanda anterior caminaba a
+# 2.49 Hz con paso de 288 mm. Es 1.8x mas rapido.
+#
+# `feet_air_time` es el termino que paga el vuelo largo, o sea pocos pasos y grandes. A 2.0
+# (exp_203) bajo la zancada de 5.20 a 4.51 Hz: empujo en la direccion correcta pero se quedo
+# corto contra `gait` 5.0, que premia el contacto y por lo tanto empuja a pisar seguido.
+# Se duplica a 4.0 para que gane el pulso.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 5.0
+    feet_air_time:
+      weight: 4.0

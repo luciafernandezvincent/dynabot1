@@ -1,0 +1,26 @@
+# exp_210_lento_rodilla — base: exp_209_combo_gait_bajo (la marcha mas lenta y suave: 3.46 Hz)
+#
+# exp_209 logro la caminata pedida (3.46 Hz, paso 199 mm, mejor suavidad de la tanda) pero una
+# pata apoya baja hacia adelante (front_left 61 mm) mientras las otras van a 100-240 mm.
+# `knee_clearance` actua SOLO sobre el arm_link que baja de min_height, asi que en este caso
+# empuja exactamente a la pata rezagada y deja quietas las demas.
+#
+# Recalibrado respecto del default (min_height 0.11, std 0.005), que fallo en sin_delay/exp_101:
+#   - min_height 0.10: el objetivo es >100 mm en ambas direcciones.
+#   - std 0.005 -> 0.02: con std chico el exp(-x/std) se aplana en cuanto la violacion crece
+#     (la pata a 60 mm queda en la zona sin gradiente); con 0.02 hay pendiente en todo el rango.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 2.5
+    feet_air_time:
+      weight: 4.0
+    action_rate_l2:
+      weight: -0.3
+    knee_clearance:
+      weight: 1.0
+      params:
+        min_height: 0.10
+        std: 0.02

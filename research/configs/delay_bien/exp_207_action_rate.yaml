@@ -1,0 +1,24 @@
+# exp_207_action_rate — base: exp_203_gait_airtime (campeon, 0.5511)
+#
+# Ataca la suavidad por la via directa. `action_rate_l2` penaliza el cambio de accion entre
+# pasos consecutivos: es el proxy clasico de "movimiento nervioso". Esta en -0.1 por defecto y
+# nunca se toco en esta tanda; se triplica a -0.3.
+#
+# En el campeon los dos terminos de suavidad son de los peores del score:
+#   orientation_smoothness  norm 0.446
+#   movement_smoothness     norm 0.417
+# Entre los dos pesan 0.18, mas que `knee_clearance` (0.12).
+#
+# Con delay 5 hay un motivo extra: la politica no ve el efecto de su accion hasta 5 pasos
+# despues, lo que favorece correcciones bruscas y tardias. Penalizar el cambio de accion deberia
+# empujarla a comandos mas estables, que es justo lo que un retardo pide.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 5.0
+    feet_air_time:
+      weight: 2.0
+    action_rate_l2:
+      weight: -0.3

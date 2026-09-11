@@ -1,0 +1,22 @@
+# exp_202_gait — base: exp_201_joint_deviation (campeon, 0.5286)
+#
+# Por que gait ahora:
+# exp_201 arreglo la postura (desviacion 0.1426 -> 0.0547 rad) y con eso subio la rodilla de
+# 54.9 a 65.3 mm. Pero la asimetria entre patas, aunque bajo de 3.9x a 2.0x, SIGUE siendo el
+# factor que fija la metrica: el score usa el PEOR caso, y hoy la peor pata (front_left 0.0653)
+# esta a la mitad de la mejor (back_left 0.1290). Mientras las patas no vayan coordinadas,
+# subir el promedio no mueve el minimo.
+#
+# `gait` premia el apoyo en diagonales sincronizadas (trote). En la tanda sin_delay fue
+# justamente el cambio que produjo el mayor salto de rodilla (61 -> 98 mm) por este mismo
+# mecanismo: rompio la pata "rezagada" que raspaba. Aca hay ademas un motivo propio del
+# regimen delay 5: la marcha quedo apurada (3.99 Hz) y desordenada, y un patron de contacto
+# impuesto le da estructura a una politica que con retardo tiende a improvisar.
+#
+# Riesgo a mirar: forzar el trote puede subir el impacto, que exp_201 ya empeoro (77.7 N).
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 5.0

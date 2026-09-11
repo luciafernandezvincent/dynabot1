@@ -1,0 +1,26 @@
+# exp_216_receta_exp122 — receta EXACTA de sin_delay/exp_122_combo_action_rate_saturation
+#
+# Pedido del usuario: "mira el result del sin_delay/exp_122 que ese tiene un buen movimiento de
+# patas y va mas lento e intenta realizar algo parecido".
+# En su tanda (delay 1, 9 Nm) exp_122 camino a 2.17 Hz con paso de 318 mm, suavidad de orientacion
+# 0.150 y 39% menos pisadas que nuestro exp_213. Se copia la receta sin cambios para medir cuanto de
+# esa marcha se traslada al regimen de delay 5 (el retardo es fisica: no se toca).
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    feet_air_time:
+      weight: 2.25
+    gait:
+      weight: 5.0
+    foot_impact:
+      weight: -0.015
+      params:
+        threshold: 50.0
+    action_rate_l2:
+      weight: -0.3
+    torque_saturation:
+      weight: -0.01
+agent:
+  algorithm:
+    num_learning_epochs: 8

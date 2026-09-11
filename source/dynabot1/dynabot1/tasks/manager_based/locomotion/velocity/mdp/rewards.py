@@ -63,6 +63,41 @@ def foot_impact_penalty(
     return torch.sum(excess * first_contact.float(), dim=1)
 
 
+def stand_still_penalty(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    threshold: float,
+    joint_vel_scale: float,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Penaliza moverse cuando el comando de velocidad es chico o cero: el robot tiene que quedarse quieto.
+
+    Pedido del usuario (11/09/2026): "si la velocidad pedida es bastante chica o cercana a cero sea
+    cercana a cero tambien o directamente cero". Ningun termino cubria el caso: los de tracking
+    premian seguir el comando pero no castigan marcar el paso en el lugar, y `feet_air_time` y
+    `gait` solo se apagan con comando exactamente cero.
+
+    Mide dos formas de moverse, las dos en cuadratico (L2) como `lin_vel_z_l2` y `joint_vel_l2`:
+      - desplazarse: velocidad del torso en el plano (vx, vy) y de giro (wz);
+      - marcar el paso: velocidad de las articulaciones, escalada por `joint_vel_scale` para que
+        quede en el mismo orden que la del torso (marchando, sum(qd^2) es del orden de 100-1000).
+
+    Compuerta suave sobre la norma del comando [vx, vy, wz]: vale 1 con comando cero y baja
+    linealmente hasta 0 en `threshold`. Por encima de `threshold` el termino no existe, asi que no
+    interfiere con la marcha normal.
+
+    Se usa con peso NEGATIVO.
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    cmd_norm = torch.norm(env.command_manager.get_command(command_name), dim=1)
+    gate = torch.clamp(1.0 - cmd_norm / threshold, min=0.0, max=1.0)
+    base_motion = torch.sum(torch.square(asset.data.root_lin_vel_b[:, :2]), dim=1) + torch.square(
+        asset.data.root_ang_vel_b[:, 2]
+    )
+    joint_motion = torch.sum(torch.square(asset.data.joint_vel[:, asset_cfg.joint_ids]), dim=1)
+    return gate * (base_motion + joint_vel_scale * joint_motion)
+
+
 def foot_clearance_reward(
     env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, target_height: float, std: float, tanh_mult: float
 ) -> torch.Tensor:

@@ -106,7 +106,8 @@ class CommandsCfg:
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
+            lin_vel_x=(-0.0, 0.0), lin_vel_y=(-0.0, 0.0), ang_vel_z=(-0.0, 0.0), heading=(-math.pi, math.pi)
+            #lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
             #lin_vel_x=(1.0, 1.0), lin_vel_y=(0.0, 1.0), ang_vel_z=(0.0, 0.0), heading=(0, 0)
         ),
     )
@@ -323,6 +324,21 @@ class RewardsCfg:
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*hand_link"),
             "threshold": 50.0,
+        },
+    )
+
+    # peso 0: disponible para tunear via YAML. Pedido del usuario (11/09/2026): con comando chico o
+    # cero el robot tiene que quedarse quieto, sin desplazarse ni marcar el paso. Compuerta lineal:
+    # plena con comando cero, se apaga en |cmd| = threshold. joint_vel_scale lleva la velocidad de
+    # las articulaciones (sum qd^2 ~ 100-1000 marchando) al orden de la del torso.
+    stand_still = RewTerm(
+        func=mdp.stand_still_penalty,
+        weight=0.0,
+        params={
+            "command_name": "base_velocity",
+            "threshold": 0.2,
+            "joint_vel_scale": 0.01,
+            "asset_cfg": SceneEntityCfg("robot"),
         },
     )
 

@@ -1,0 +1,27 @@
+# exp_205_foot_impact_suave — base: exp_203_gait_airtime (campeon, 0.5511)
+#
+# exp_204 probo `foot_impact` a -0.015 y dejo un resultado con dos caras:
+#   a favor: impacto 87.6 -> 64.9 N (-26%), saturacion de torque 1.76% (la mas baja de la
+#            tanda), paso 157 -> 174 mm, zancada 4.51 -> 4.01 Hz.
+#   en contra: una pata se desincronizo hacia adelante (back_right a 61 mm) y, como
+#            `knee_clearance` puntua el PEOR caso, el termino se desplomo 0.657 -> 0.505.
+#
+# O sea: el termino sirve, la dosis es demasiado alta. A -0.015 la politica prefiere ARRASTRAR
+# una pata (apoyo plano y bajo, sin pico de fuerza) antes que bajar el pie desde arriba, y eso
+# es exactamente lo que la tanda quiere evitar.
+#
+# Se baja a un tercio: -0.005. La hipotesis es que el alivio de impacto no es lineal en el peso
+# -- alcanza con encarecer un poco el golpe para que la politica deje de pegar los picos mas
+# grandes -- mientras que la distorsion de la pisada si necesita una presion sostenida.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 5.0
+    feet_air_time:
+      weight: 2.0
+    foot_impact:
+      weight: -0.005
+      params:
+        threshold: 50.0

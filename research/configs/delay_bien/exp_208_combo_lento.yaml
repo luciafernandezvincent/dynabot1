@@ -1,0 +1,20 @@
+# exp_208_combo_lento — base: exp_207_action_rate (campeon, 0.5728)
+#
+# Pedido del usuario: caminata mas suave y lenta en terminos de pasos.
+# exp_206 (feet_air_time 4.0) y exp_207 (action_rate_l2 -0.3) ganaron POR SEPARADO sobre exp_203
+# y por mecanismos distintos:
+#   - feet_air_time encarece cada pisada (con vuelos de ~0.13 s y threshold 0.5 s, cada
+#     contacto resta), asi que la politica da menos pasos: 4.51 -> 4.13 Hz.
+#   - action_rate_l2 encarece el cambio brusco de comando; un comando que no puede cambiar
+#     rapido no sostiene un ritmo alto: 4.51 -> 3.97 Hz, y la suavidad sube.
+# Se suman los dos.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 5.0
+    feet_air_time:
+      weight: 4.0
+    action_rate_l2:
+      weight: -0.3
