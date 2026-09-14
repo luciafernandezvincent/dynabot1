@@ -47,7 +47,10 @@ RESEARCH_DIR = REPO_ROOT / "research"
 # diferencia de la tanda anterior que corrio con delay 5. Para volver al layout viejo (todo
 # plano bajo research/ y logs/rsl_rl/anymal_d_flat/), poner VARIANT = "".
 # --------------------------------------------------------------------------------------
-VARIANT = "delay_bien"
+# "delay_best" (11/09/2026): mismo regimen fisico que delay_bien (delay 5, actuadores 9 Nm) pero con
+# la observacion nueva de historial de acciones (last_action x4 + ActionDelayWrapper reemplazandolo
+# por las acciones pendientes). Tanda con baseline propia; ver research/runs/delay_best/PLAN.md.
+VARIANT = "delay_best"
 
 RESULTS_JSONL = RESEARCH_DIR / "runs" / VARIANT / "results.jsonl"
 RESULTS_MD = RESEARCH_DIR / "runs" / VARIANT / "RESULTS.md"
