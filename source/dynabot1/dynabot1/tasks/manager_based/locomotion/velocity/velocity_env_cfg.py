@@ -106,8 +106,11 @@ class CommandsCfg:
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
-            #lin_vel_x=(1.0, 1.0), lin_vel_y=(0.0, 1.0), ang_vel_z=(0.0, 0.0), heading=(0, 0)
+            # restaurado a (-1, 1) el 11/09/2026 para la tanda delay_best (con 0 el perro no camina y
+            # eval.py no puede medir la rodilla hacia atras). Rango en 0, para probar stand_still:
+            lin_vel_x=(1.0, 1.0), lin_vel_y=(-0.0, 0.0), ang_vel_z=(-0.0, 0.0), heading=(-math.pi, math.pi)
+            #lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
+                    
         ),
     )
 
@@ -252,7 +255,7 @@ class RewardsCfg:
     feet_air_time = RewTerm(
         func=mdp.feet_air_time,
         #weight=0.125,
-        weight=0.22,
+        weight=0.0, #0.22
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*hand_link"),
             "command_name": "base_velocity",
@@ -325,6 +328,18 @@ class RewardsCfg:
         },
     )
 
+   
+    #
+    # QUE VIGILAR: la aceleracion angular baja por dos vias, caminando mas suave o caminando menos.
+    # Los indicadores son stride_frequency_hz_mean y step_length_m: si la frecuencia baja Y el paso
+    # se acorta a la vez, el termino compro quietud y no suavidad. El gate previene el caso
+    # degenerado (quedarse quieto), no el intermedio (pasitos cortos).
+    base_ang_acc = RewTerm(
+        func=mdp.BaseAngularAcceleration,
+        weight=0.0,
+        params={"asset_cfg": SceneEntityCfg("robot"), "velocity_threshold": 0.1},
+    )
+
     foot_clearance = RewTerm(
         func=mdp.foot_clearance_reward,
         weight=0.0,
@@ -366,7 +381,7 @@ class RewardsCfg:
     # 40.6 -> 10.3 mm, swing 197 -> 134 ms, zancada 2.56 -> 4.54 Hz: pasitos apurados y rasantes.
     joint_deviation_shoulder = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=0.0,
+        weight=-0.5,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_shoulder"])},
     )
 

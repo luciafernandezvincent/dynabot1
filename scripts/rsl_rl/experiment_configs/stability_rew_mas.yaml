@@ -1,0 +1,8 @@
+env:
+  rewards:
+    gait: 
+     weight: 0.5
+    flat_orientation_l2:
+     weight: -1.5
+
+  episode_length_s: 20.0

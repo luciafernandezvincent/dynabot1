@@ -231,3 +231,81 @@ class GaitReward(ManagerTermBase):
         se_act_0 = torch.clip(torch.square(air_time[:, foot_0] - contact_time[:, foot_1]), max=self.max_err**2)
         se_act_1 = torch.clip(torch.square(contact_time[:, foot_0] - air_time[:, foot_1]), max=self.max_err**2)
         return torch.exp(-(se_act_0 + se_act_1) / self.std)
+
+
+class BaseAngularAcceleration(ManagerTermBase):
+    """Penaliza la ACELERACION angular de la base: el tiron del cuerpo, no su inclinacion.
+
+    Motivo (16/09/2026): `orientation_smoothness` es el unico termino del score que ningun reward
+    mira, y se nota -- quedo entre 0.49 y 0.577 en las 11 corridas de la tanda sin_delay, sin
+    importar que se cambiara. Los dos terminos de orientacion que existen apuntan a otra cosa:
+
+      - `flat_orientation_l2` (-5.0) penaliza el ANGULO: que el cuerpo este inclinado.
+      - `ang_vel_xy_l2` (-0.05) penaliza la VELOCIDAD angular: que el cuerpo rote.
+      - este penaliza la ACELERACION angular: que el giro cambie de golpe.
+
+    Un cuerpo puede estar perfectamente horizontal (bien para el primero), girando despacio (bien
+    para el segundo) y llegar igual con sacudones. Eso es lo que sentiria un IMU montado en el lomo
+    y es lo que el juez puntua.
+
+    REPLICA DE LA METRICA DEL JUEZ. `compute_orientation_smoothness` en `scripts/rsl_rl/eval.py`
+    hace: euler(quat) -> unwrap -> primera diferencia / dt -> segunda diferencia / dt -> media del
+    VALOR ABSOLUTO sobre los tres ejes. Tres decisiones se copian de ahi, no son gusto:
+
+      1. **L1, no L2.** El juez promedia |acc|. Un termino cuadratico castigaria los picos mucho
+         mas que la media y optimizaria otra cosa.
+      2. **Los tres ejes, yaw incluido.** El juez no excluye el yaw (a diferencia de
+         `orientation_stability`, que solo mira roll/pitch). Penalizar la ACELERACION de yaw no
+         castiga girar: un giro a tasa constante tiene aceleracion cero. Castiga cambiar de tasa.
+      3. **La derivada se toma de la velocidad angular del MUNDO** (`root_ang_vel_w`), no de los
+         angulos de Euler reconstruidos paso a paso. Las tasas de Euler y la velocidad angular del
+         mundo difieren por una matriz cinematica que tiende a la identidad cuanto mas horizontal
+         esta el cuerpo; con roll/pitch de ~0.03 rad (lo medido en esta tanda) la diferencia es de
+         segundo orden, y evita tener que guardar dos estados previos y desenrollar angulos dentro
+         del reward.
+
+    GATE POR COMANDO. Se cobra solo con comando de velocidad por encima de `velocity_threshold`
+    (mismo patron que `GaitReward`). Sin eso el optimo del termino es quedarse quieto, que esta
+    medido en este repo: una politica sin entrenar, con las cuatro patas apoyadas el 99.5% del
+    tiempo, saca mejor estabilidad y suavidad que cualquier marcha entrenada. Un reward "puro" de
+    estabilidad SIN gate paga por no caminar.
+
+    ESCALA. El juez reporta `1/(1+mean|acc|)`, y de ahi sale la magnitud cruda: la baseline de la
+    tanda (smoothness 0.1363) tiene mean|acc| = 6.3 rad/s^2 por eje, o sea ~19 sumando los tres.
+    Con peso -5e-3 eso aporta del orden de -0.15 al reward de episodio, comparable a
+    `joint_deviation` (-0.15) y `foot_impact` (-0.18). Peso 0 por default: no cambia ninguna
+    baseline hasta que un YAML lo active. Calibrar con un smoke test de 5 iteraciones y mirar
+    `Episode_Reward/base_ang_acc` antes de gastar un entrenamiento entero -- la leccion de
+    `torque_rate` (exp_119), que corrio con un peso 4x corto y aporto menos del 1% del reward.
+
+    QUE VIGILAR. La aceleracion angular baja por dos vias: caminando mas suave o caminando menos.
+    Los indicadores son `stride_frequency_hz_mean` y `step_length_m`: si la frecuencia baja y el
+    paso se acorta a la vez, el termino compro quietud y no suavidad.
+    """
+
+    def __init__(self, cfg: RewardTermCfg, env: ManagerBasedRLEnv):
+        super().__init__(cfg, env)
+        self.asset: Articulation = env.scene[cfg.params["asset_cfg"].name]
+        self.prev_ang_vel = torch.zeros((env.num_envs, 3), device=env.device)
+        # arranca en False: el primer paso de un episodio no tiene velocidad previa valida
+        self.has_prev = torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
+
+    def reset(self, env_ids: torch.Tensor | None = None):
+        if env_ids is None:
+            env_ids = slice(None)
+        self.prev_ang_vel[env_ids] = 0.0
+        # sin esto, el salto entre la velocidad angular del ultimo paso de un episodio y la del
+        # primero del siguiente contaria como un sacudon enorme. Es el reset, no la marcha: el juez
+        # lo descarta con `valid_acc` y aca se descarta igual.
+        self.has_prev[env_ids] = False
+
+    def __call__(
+        self, env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, velocity_threshold: float
+    ) -> torch.Tensor:
+        ang_vel = self.asset.data.root_ang_vel_w
+        acc = torch.sum(torch.abs(ang_vel - self.prev_ang_vel) / env.step_dt, dim=1)
+        acc = torch.where(self.has_prev, acc, torch.zeros_like(acc))
+        self.prev_ang_vel[:] = ang_vel
+        self.has_prev[:] = True
+        cmd = torch.norm(env.command_manager.get_command("base_velocity")[:, :2], dim=1)
+        return torch.where(cmd > velocity_threshold, acc, torch.zeros_like(acc))
