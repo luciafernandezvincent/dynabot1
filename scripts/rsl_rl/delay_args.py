@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import argparse
 
-from dynabot1.wrappers import ActionDelayWrapper 
+# NOTE: do NOT import dynabot1 at module level. train/play/eval import this file BEFORE AppLauncher
+# starts Isaac Sim, and dynabot1 pulls in isaaclab_tasks/omni modules, which Isaac Sim rejects
+# ("execute other Omniverse/Isaac Sim imports after instantiating SimulationApp").
+
 
 def add_delay_args(parser: argparse.ArgumentParser) -> None:
     """Register the action-delay flags shared by train_delay.py / play_delay.py / eval.py."""
@@ -62,6 +65,8 @@ def infer_action_history_length(env_cfg) -> int:
 
 def maybe_wrap_with_delay(env, env_cfg, args_cli, log=print):
     """Wrap `env` with the action delay configured on the CLI, if any. Returns the env."""
+    from dynabot1.wrappers import ActionDelayWrapper  # imported late: needs Isaac Sim running
+
     history_length = (
         args_cli.action_history_length
         if getattr(args_cli, "action_history_length", None) is not None
