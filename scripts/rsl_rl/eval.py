@@ -14,6 +14,7 @@ from isaaclab.app import AppLauncher
 
 # local imports
 import cli_args  # isort: skip
+from delay_args import add_delay_args, maybe_wrap_with_delay  # isort: skip
 from experiment_config import apply_experiment_config  # isort: skip
 
 # add argparse arguments
@@ -29,7 +30,7 @@ parser.add_argument(
     action="store_true",
     help="Use the pre-trained checkpoint from Nucleus.",
 )
-parser.add_argument("--action-delay", type=int, default=1, help="Number of steps to delay actions (1 = no delay)")
+add_delay_args(parser)
 parser.add_argument("--num_steps", type=int, default=1000, help="Number of simulation steps to run the evaluation for.")
 parser.add_argument(
     "--torque_legs", type=str, default="front_left,back_left",
@@ -697,10 +698,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
 
-    # apply action delay wrapper if action_delay > 1
-    if args_cli.action_delay > 1:
-        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay)
-        print(f"[INFO] Action delay enabled: {args_cli.action_delay} steps delay")
+    # apply action delay wrapper: randomized per env if a range was given, fixed otherwise
+    env = maybe_wrap_with_delay(env, env_cfg, args_cli)
 
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)

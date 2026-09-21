@@ -14,6 +14,7 @@ from isaaclab.app import AppLauncher
 
 # local imports
 import cli_args  # isort: skip
+from delay_args import add_delay_args, maybe_wrap_with_delay  # isort: skip
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
@@ -34,7 +35,7 @@ parser.add_argument(
     help="Use the pre-trained checkpoint from Nucleus.",
 )
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
-parser.add_argument("--action-delay", type=int, default=1, help="Number of steps to delay actions (1 = no delay)")
+add_delay_args(parser)
 parser.add_argument(
     "--experiment_config", type=str, default=None,
     help="Path to a YAML with env/agent overrides used to train the checkpoint being played.",
@@ -169,10 +170,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print_dict(video_kwargs, nesting=4)
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
-    # Apply action delay wrapper if action_delay > 1
-    if args_cli.action_delay > 1:
-        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay)
-        print(f"[INFO] Action delay enabled: {args_cli.action_delay} steps delay")
+    # apply action delay wrapper: randomized per env if a range was given, fixed otherwise
+    env = maybe_wrap_with_delay(env, env_cfg, args_cli)
 
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)

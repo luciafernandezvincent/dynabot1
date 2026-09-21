@@ -15,6 +15,7 @@ from isaaclab.app import AppLauncher
 # local imports
 import cli_args  # isort: skip
 from experiment_config import apply_experiment_config  # isort: skip
+from delay_args import add_delay_args, maybe_wrap_with_delay  # isort: skip
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
@@ -35,7 +36,7 @@ parser.add_argument("--export_io_descriptors", action="store_true", default=Fals
 parser.add_argument(
     "--ray-proc-id", "-rid", type=int, default=None, help="Automatically configured by Ray integration, otherwise None."
 )
-parser.add_argument("--action-delay", type=int, default=1, help="Number of steps to delay actions (1 = no delay)")
+add_delay_args(parser)
 parser.add_argument("--name", type=str, default="", help="Name for the experiment folder")
 parser.add_argument("--experiment_config", type=str, default=None,
     help=(
@@ -216,10 +217,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print_dict(video_kwargs, nesting=4)
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
-    # Apply action delay wrapper if action_delay > 1
-    if args_cli.action_delay > 1:
-        env = ActionDelayWrapper(env, delay_steps=args_cli.action_delay)
-        logger.info(f"[INFO] Action delay enabled: {args_cli.action_delay} steps delay")
+    # Apply action delay wrapper: randomized per env if a range was given, fixed otherwise
+    env = maybe_wrap_with_delay(env, env_cfg, args_cli, log=logger.info)
 
     start_time = time.time()
 
