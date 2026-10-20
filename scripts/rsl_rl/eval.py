@@ -104,16 +104,38 @@ import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
+import isaaclab.utils.math as math_utils
+
 import dynabot1.tasks  # noqa: F401
 from dynabot1.wrappers import ActionDelayWrapper
+
+
+# Punta del pie en el frame de hand_link, medida sobre la malla de colision de dyna1_gazebo3.usd
+# (punto mas bajo del pie en la pose cero del USD; identico en las 4 patas). El origen de hand_link
+# es la rodilla, asi que sin este offset el "despeje de pie" mediria la rodilla.
+FOOT_TIP_OFFSET_IN_HAND_FRAME = (0.1863, -0.0413, 0.0)
 
 
 def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: dict):
     """Called once per simulation step. Fill this in with per-step evaluation logic."""
     term_manager = env.unwrapped.termination_manager
-    state["base_falls"] += int(term_manager.get_term("base_contact").sum().item())
-    state["shoulder_falls"] += int(term_manager.get_term("shoulder_contact").sum().item())
+    base_contact = term_manager.get_term("base_contact")
+    shoulder_contact = term_manager.get_term("shoulder_contact")
+    state["base_falls"] += int(base_contact.sum().item())
+    state["shoulder_falls"] += int(shoulder_contact.sum().item())
     state["episodes"] += int(dones.sum().item())
+
+    # los mismos conteos SIN sumar sobre los envs. Con el delay estratificado cada env tiene un lag
+    # conocido y fijo toda la corrida, asi que esto es lo que permite responder "se cae a lag 7?"
+    # en vez de solo "se cae". Cuesta tres tensores de (num_envs,).
+    if state["base_falls_per_env"] is None:
+        zeros = torch.zeros_like(base_contact, dtype=torch.float)
+        state["base_falls_per_env"] = zeros.clone()
+        state["shoulder_falls_per_env"] = zeros.clone()
+        state["episodes_per_env"] = zeros.clone()
+    state["base_falls_per_env"] += base_contact.float()
+    state["shoulder_falls_per_env"] += shoulder_contact.float()
+    state["episodes_per_env"] += dones.float()
 
     # foot contact analysis: impact force, stride frequency, and duty factor per foot
     contact_sensor = env.unwrapped.scene.sensors["contact_forces"]
@@ -127,10 +149,33 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
     in_contact = contact_sensor.data.current_contact_time[:, state["foot_ids"]] > 0.0
     state["foot_touchdowns"] += first_contact.sum(dim=0).float()
     state["foot_contact_steps"] += in_contact.sum(dim=0).float()
+    # idem, sin colapsar la dimension de env: (num_envs, num_feet)
+    if state["foot_touchdowns_per_env"] is None:
+        state["foot_touchdowns_per_env"] = torch.zeros_like(first_contact, dtype=torch.float)
+        state["foot_contact_steps_per_env"] = torch.zeros_like(first_contact, dtype=torch.float)
+    state["foot_touchdowns_per_env"] += first_contact.float()
+    state["foot_contact_steps_per_env"] += in_contact.float()
 
-    # altura de cada pie y si esta apoyado, para medir cuanto despega en el swing
+    # altura de cada pie y si esta apoyado, para medir cuanto despega en el swing.
+    #
+    # OJO (fix 21/09/2026): los ids de `contact_sensor.find_bodies` estan en el orden del SENSOR
+    # (DFS: base, BL shoulder/arm/hand, BR ...) y `body_pos_w` esta en el orden de la ARTICULACION
+    # (BFS: base, 4 shoulders, 4 arms, 4 hands). Indexar uno con los ids del otro leia otros
+    # cuerpos: el "pie" era [hombro FL, cadera BR, rodilla BL, rodilla FR]. Los ids de posicion se
+    # resuelven contra la articulacion, en el mismo orden de nombres que el sensor.
+    #
+    # Ademas el origen de hand_link es la articulacion de la RODILLA (arm_to_hand), no el pie: la
+    # punta del pie esta ~20 cm mas abajo sobre el mismo cuerpo. Se mide ese punto.
     articulation_for_feet = env.unwrapped.scene.articulations["robot"]
-    foot_z = articulation_for_feet.data.body_pos_w[:, state["foot_ids"], 2].detach().cpu().numpy()
+    if state["foot_body_ids"] is None:
+        state["foot_body_ids"], _ = articulation_for_feet.find_bodies(state["foot_names"], preserve_order=True)
+        state["foot_tip_offset"] = torch.tensor(
+            FOOT_TIP_OFFSET_IN_HAND_FRAME, device=env.unwrapped.device
+        ).repeat(env.unwrapped.num_envs, len(state["foot_body_ids"]), 1)
+    hand_pos = articulation_for_feet.data.body_pos_w[:, state["foot_body_ids"]]
+    hand_quat = articulation_for_feet.data.body_quat_w[:, state["foot_body_ids"]]
+    foot_tip = hand_pos + math_utils.quat_apply(hand_quat, state["foot_tip_offset"])
+    foot_z = foot_tip[..., 2].detach().cpu().numpy()
     if state["foot_z"] is None:
         state["foot_z"] = []
         state["foot_in_contact"] = []
@@ -148,7 +193,15 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
     # de elbow_contact_rate, que solo cuenta cuando el sensor YA esta en contacto, esto mide la
     # distancia real en todo momento: yendo hacia atras el robot puede pasar muy cerca del piso
     # (casi "gateando") sin llegar a disparar el umbral de contacto de undesired_contacts.
-    knee_z = articulation_for_feet.data.body_pos_w[:, state["arm_ids"], 2].detach().cpu().numpy()
+    #
+    # fix 21/09/2026: el origen de arm_link es la CADERA (pivote shoulder_to_arm), siempre a la
+    # altura del torso. La rodilla real es el origen de hand_link (pivote arm_to_hand, ~153 mm del
+    # piso en reposo). Y los ids salen de la articulacion, no del sensor (ver el fix del pie arriba):
+    # antes esto leia [hombro BR, cadera BL, cadera FR, rodilla FL].
+    if state["knee_body_ids"] is None:
+        state["knee_body_ids"], _ = articulation_for_feet.find_bodies(state["foot_names"], preserve_order=True)
+        state["knee_names"] = [name.replace("_hand_link", "_knee") for name in state["foot_names"]]
+    knee_z = articulation_for_feet.data.body_pos_w[:, state["knee_body_ids"], 2].detach().cpu().numpy()
     if state["knee_z"] is None:
         state["knee_z"] = []
         state["knee_backward_mask"] = []
@@ -168,6 +221,9 @@ def evaluate_step(env, obs, actions, rewards, dones, extras, step: int, state: d
         state["impact_force_sq_sum"] += (impact_forces**2).sum().item()
         state["impact_force_count"] += impact_forces.numel()
         state["impact_force_max"] = max(state["impact_force_max"], impact_forces.max().item())
+    # impacto por env y paso (suma y cantidad de pisadas), para desglosarlo por direccion de comando
+    state["impact_sum_frames"].append((foot_forces * first_contact).sum(dim=1).detach().cpu().numpy())
+    state["impact_count_frames"].append(first_contact.sum(dim=1).detach().cpu().numpy())
 
     # Record joint positions for smoothness analysis
     articulation = env.unwrapped.scene.articulations["robot"]
@@ -482,6 +538,53 @@ def compute_velocity_tracking_accuracy(cmd_vels, actual_vels, std: float = 0.5):
     return float((lin_tracking + ang_tracking) / 2.0)
 
 
+def compute_directional_smoothness(state: dict, dt: float) -> dict:
+    """Suavidad separada por direccion de comando (adelante: vx > 0.1, atras: vx < -0.1).
+
+    `movement_smoothness` esta saturada (~0.988 en todos los experimentos) y mezcla direcciones,
+    asi que no distingue si un cambio suaviza la marcha HACIA ADELANTE. Informativo: no entra al
+    score. Menos es mejor en todas:
+      joint_acc_mean      aceleracion articular media, rad/paso^2 (misma unidad que movement_smoothness)
+      base_acc_z_mean     aceleracion vertical media del torso, m/s^2 (rebote)
+      base_ang_acc_mean   aceleracion angular media de roll/pitch del torso, rad/s^2 (cabeceo brusco)
+      impact_force_mean   fuerza media en el instante de la pisada, N
+    """
+    if not state["joint_positions"] or not state["knee_forward_mask"]:
+        return {}
+    q = np.array(state["joint_positions"])  # (T, E, J)
+    if q.shape[0] < 3 or len(state["knee_forward_mask"]) != q.shape[0]:
+        return {}
+    dones = np.array(state["done_history"])  # (T, E)
+    valid_vel = ~dones[1:]
+    valid_acc = valid_vel[:-1] & valid_vel[1:]  # (T-2, E), sin muestras que crucen un reset
+
+    joint_acc = np.abs(np.diff(q, n=2, axis=0)).mean(axis=-1)  # (T-2, E)
+    z = np.array(state["base_positions"])[:, :, 2]
+    base_acc_z = np.abs(np.diff(z, n=2, axis=0)) / dt**2
+    euler = np.unwrap(quat_to_euler(np.array(state["base_quats"]))[:, :, :2], axis=0)
+    base_ang_acc = np.abs(np.diff(euler, n=2, axis=0)).mean(axis=-1) / dt**2
+    impact_sum = np.array(state["impact_sum_frames"])
+    impact_cnt = np.array(state["impact_count_frames"])
+
+    out = {}
+    for direction, mask_list in (("forward", state["knee_forward_mask"]), ("backward", state["knee_backward_mask"])):
+        mask = np.array(mask_list)  # (T, E)
+        m = mask[1:-1] & valid_acc
+        if not m.any():
+            out[direction] = None
+            continue
+        entry = {
+            "joint_acc_mean": float(joint_acc[m].mean()),
+            "base_acc_z_mean": float(base_acc_z[m].mean()),
+            "base_ang_acc_mean": float(base_ang_acc[m].mean()),
+        }
+        if impact_sum.shape == mask.shape:
+            n = impact_cnt[mask].sum()
+            entry["impact_force_mean"] = float(impact_sum[mask].sum() / n) if n > 0 else 0.0
+        out[direction] = entry
+    return out
+
+
 def compute_results(env, state: dict) -> dict:
     """Called once after the simulation loop ends. Fill this in to aggregate the final metrics."""
     total_falls = state["base_falls"] + state["shoulder_falls"]
@@ -526,7 +629,7 @@ def compute_results(env, state: dict) -> dict:
         knee_height_min_per_link_backward,
         knee_height_min_per_link_forward,
     ) = compute_knee_clearance(
-        state["knee_z"], state["knee_backward_mask"], state["knee_forward_mask"], state["arm_names"] or []
+        state["knee_z"], state["knee_backward_mask"], state["knee_forward_mask"], state["knee_names"] or []
     )
 
     # Calculate orientation metrics
@@ -618,7 +721,172 @@ def compute_results(env, state: dict) -> dict:
         "orientation_stability_0to1": orientation_stability,
         "orientation_smoothness_0to1": orientation_smoothness,
         "velocity_tracking_accuracy_0to1": velocity_tracking,
+        "smoothness_by_direction": compute_directional_smoothness(state, env.unwrapped.step_dt),
+        # version de las metricas de rodilla/pie. v2 = fix del 21/09/2026 (ids de la articulacion,
+        # rodilla = origen de hand_link, pie = punta de hand_link). Los results.json sin esta clave
+        # son v1 y sus knee_height_* / foot_clearance_* NO miden rodilla ni pie.
+        "body_metrics_version": 2,
     }
+
+
+def describe_delay_regime(delay_wrapper) -> dict:
+    """Deja en el results.json bajo que retardo se midio esto.
+
+    Sin esto, un eval a delay fijo 5 y uno a 5..8 producen JSON indistinguibles, y la tabla de
+    resultados no tiene como saber que dos numeros no son comparables.
+    """
+    lags = delay_wrapper.get_delay_steps()
+    regime = {
+        "mode": (
+            "fixed" if delay_wrapper.delay_range is None
+            else ("stratified" if delay_wrapper.stratified else "randomized")
+        ),
+        "delay_range": list(delay_wrapper.delay_range) if delay_wrapper.delay_range else None,
+        "action_history_length": delay_wrapper.action_history_length,
+        "envs_per_lag": {str(lag): count for lag, count in sorted(delay_wrapper.lag_counts().items())},
+    }
+    if lags is not None:
+        regime["lag_min"] = int(lags.min())
+        regime["lag_max"] = int(lags.max())
+    return regime
+
+
+def _subset_frames(frames, env_idx):
+    """Toma la lista de (num_envs, ...) por paso y se queda con los envs pedidos."""
+    if not frames:
+        return frames
+    return [frame[env_idx] for frame in frames]
+
+
+def compute_per_lag_results(env, state: dict, delay_wrapper) -> dict:
+    """Recalcula las metricas por separado para cada lag de accion.
+
+    Por que hace falta: casi todas las metricas agregan sobre los 1000 envs, y varias son un
+    extremo, no un promedio. `knee_height_min_backward_m`, la del objetivo principal, es un
+    `np.min` sobre todos los pasos x todos los envs x las 4 rodillas, asi que con lags mezclados
+    el numero sale casi siempre de los envs del lag mas alto (el caso mas dificil). Una politica
+    que da 115 mm a lag 4 y 72 mm a lag 7 reporta 72 mm, indistinguible de una que anda mal en
+    todo el rango. Este desglose separa las dos situaciones.
+
+    Solo se calcula con reparto estratificado: ahi el mapa env -> lag es fijo y conocido, asi que
+    agrupar es exacto. Con el sorteo aleatorio el lag de cada env cambia en cada reset de
+    episodio, y `lags` al final de la corrida NO dice a que lag corrio ese env la mayor parte del
+    tiempo: agrupar por ese valor seria sencillamente incorrecto.
+    """
+    lags = delay_wrapper.get_delay_steps()
+    if lags is None:
+        return {}
+    if not delay_wrapper.stratified:
+        print("[WARN] Sin --action-delay-stratified el lag de cada env cambia en cada reset; "
+              "se omite el desglose por lag porque agrupar por el lag final seria incorrecto.")
+        return {}
+
+    lags_np = lags.detach().cpu().numpy()
+    distinct = sorted(set(int(lag) for lag in lags_np))
+    if len(distinct) < 2:
+        return {}  # un solo lag: el desglose seria una copia del agregado
+
+    step_dt = env.unwrapped.step_dt
+    num_steps = args_cli.num_steps
+    foot_names = state["foot_names"] or []
+    knee_names = state["knee_names"] or []
+    touchdowns_cpu = (
+        state["foot_touchdowns_per_env"].cpu() if state["foot_touchdowns_per_env"] is not None else None
+    )
+    contact_steps_cpu = (
+        state["foot_contact_steps_per_env"].cpu() if state["foot_contact_steps_per_env"] is not None else None
+    )
+
+    per_lag = {}
+    for lag in distinct:
+        env_idx = np.flatnonzero(lags_np == lag)
+        num_envs = int(env_idx.size)
+        entry = {"delay": lag + 1, "num_envs": num_envs}
+
+        # caidas: la pregunta central del retardo variable, "se rompe en el lag mas alto?"
+        if state["episodes_per_env"] is not None:
+            idx_t = torch.as_tensor(env_idx, device=state["episodes_per_env"].device)
+            falls = float(
+                state["base_falls_per_env"][idx_t].sum().item()
+                + state["shoulder_falls_per_env"][idx_t].sum().item()
+            )
+            episodes = float(state["episodes_per_env"][idx_t].sum().item())
+            entry["episodes_completed"] = int(episodes)
+            entry["total_falls"] = int(falls)
+            entry["fall_rate_per_episode"] = falls / episodes if episodes > 0 else 0.0
+
+        # rodilla: el objetivo principal, y la metrica que mas se distorsiona al mezclar lags
+        (
+            _knee_mean_per_link,
+            knee_height_mean,
+            _knee_height_min,
+            knee_height_mean_backward,
+            knee_height_min_backward,
+            _knee_height_mean_forward,
+            knee_height_min_forward,
+            knee_min_per_link_backward,
+            _knee_min_per_link_forward,
+        ) = compute_knee_clearance(
+            _subset_frames(state["knee_z"], env_idx),
+            _subset_frames(state["knee_backward_mask"], env_idx),
+            _subset_frames(state["knee_forward_mask"], env_idx),
+            knee_names,
+        )
+        entry["knee_height_mean_m"] = knee_height_mean
+        entry["knee_height_mean_backward_m"] = knee_height_mean_backward
+        entry["knee_height_min_backward_m"] = knee_height_min_backward
+        entry["knee_height_min_forward_m"] = knee_height_min_forward
+        entry["knee_height_min_per_link_backward_m"] = knee_min_per_link_backward
+
+        # despeje de pie
+        _cl_mean_per_foot, _cl_peak_per_foot, clearance_mean, clearance_peak = compute_foot_clearance(
+            _subset_frames(state["foot_z"], env_idx),
+            _subset_frames(state["foot_in_contact"], env_idx),
+            foot_names,
+        )
+        entry["foot_clearance_mean_m"] = clearance_mean
+        entry["foot_clearance_peak_m"] = clearance_peak
+
+        # ritmo de la marcha: el otro objetivo del usuario (caminata lenta)
+        if touchdowns_cpu is not None and foot_names:
+            idx_cpu = torch.as_tensor(env_idx)
+            stride_per_foot, duty_per_foot = compute_gait_metrics(
+                touchdowns_cpu[idx_cpu].sum(dim=0),
+                contact_steps_cpu[idx_cpu].sum(dim=0),
+                foot_names,
+                num_envs,
+                num_steps,
+                step_dt,
+            )
+            stride_mean = float(np.mean(list(stride_per_foot.values()))) if stride_per_foot else 0.0
+            entry["stride_frequency_hz_mean"] = stride_mean
+            entry["duty_factor_mean"] = float(np.mean(list(duty_per_foot.values()))) if duty_per_foot else 0.0
+        else:
+            stride_mean = 0.0
+
+        # velocidad real y largo de paso, con la misma definicion que el agregado
+        actual_sub = _subset_frames(state["actual_vels"], env_idx)
+        if actual_sub:
+            speed = float(np.mean(np.linalg.norm(np.array(actual_sub)[:, :, :2], axis=-1)))
+            entry["mean_speed_mps"] = speed
+            entry["step_length_m"] = speed / stride_mean if stride_mean > 0 else 0.0
+
+        # suavidad y seguimiento
+        joint_sub = _subset_frames(state["joint_positions"], env_idx)
+        entry["movement_smoothness"] = compute_movement_smoothness(joint_sub) if joint_sub else 0.0
+        quats_sub = _subset_frames(state["base_quats"], env_idx)
+        if quats_sub:
+            entry["orientation_stability_0to1"] = compute_orientation_stability(quats_sub)
+            entry["orientation_smoothness_0to1"] = compute_orientation_smoothness(
+                quats_sub, _subset_frames(state["done_history"], env_idx), dt=step_dt
+            )
+        cmd_sub = _subset_frames(state["cmd_vels"], env_idx)
+        if cmd_sub:
+            entry["velocity_tracking_accuracy_0to1"] = compute_velocity_tracking_accuracy(cmd_sub, actual_sub)
+
+        per_lag[str(lag)] = entry
+
+    return per_lag
 
 
 def save_torques_csv(state: dict, out_dir: str):
@@ -639,6 +907,34 @@ def save_torques_csv(state: dict, out_dir: str):
         )
         writer.writerows(state["torque_rows"])
     print(f"[INFO] Saved joint torques (env {args_cli.torque_env}) to: {out_path}")
+
+
+def print_per_lag_table(per_lag: dict) -> None:
+    """Tabla compacta del desglose por lag, para leerlo en el log sin abrir el JSON."""
+    columns = [
+        ("rodilla atras mm", "knee_height_min_backward_m", 1000.0, "{:.1f}"),
+        ("rodilla adel mm", "knee_height_min_forward_m", 1000.0, "{:.1f}"),
+        ("despeje mm", "foot_clearance_peak_m", 1000.0, "{:.1f}"),
+        ("zancada Hz", "stride_frequency_hz_mean", 1.0, "{:.2f}"),
+        ("paso mm", "step_length_m", 1000.0, "{:.0f}"),
+        ("vel_track", "velocity_tracking_accuracy_0to1", 1.0, "{:.3f}"),
+        ("ori_suav", "orientation_smoothness_0to1", 1.0, "{:.3f}"),
+        ("mov_suav", "movement_smoothness", 1.0, "{:.3f}"),
+        ("caidas/ep", "fall_rate_per_episode", 1.0, "{:.3f}"),
+    ]
+    header = f"{'lag':>4} {'delay':>6} {'envs':>5} " + " ".join(f"{name:>16}" for name, *_ in columns)
+    print("\n" + "=" * len(header))
+    print("METRICAS POR LAG DE ACCION (reparto estratificado)")
+    print("=" * len(header))
+    print(header)
+    for lag in sorted(per_lag, key=int):
+        entry = per_lag[lag]
+        cells = []
+        for _name, key, scale, fmt in columns:
+            value = entry.get(key)
+            cells.append(f"{fmt.format(value * scale):>16}" if isinstance(value, (int, float)) else f"{'-':>16}")
+        print(f"{int(lag):>4} {entry.get('delay', '-'):>6} {entry.get('num_envs', '-'):>5} " + " ".join(cells))
+    print("=" * len(header) + "\n")
 
 
 def save_results(results: dict, out_dir: str):
@@ -700,6 +996,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # apply action delay wrapper: randomized per env if a range was given, fixed otherwise
     env = maybe_wrap_with_delay(env, env_cfg, args_cli)
+    # se guarda la referencia ahora: despues queda tapado por RslRlVecEnvWrapper, y al final de la
+    # corrida hace falta su mapa env -> lag para desglosar las metricas
+    delay_wrapper = env if isinstance(env, ActionDelayWrapper) else None
 
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
@@ -724,14 +1023,25 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         "base_falls": 0,
         "shoulder_falls": 0,
         "episodes": 0,
+        "base_falls_per_env": None,
+        "shoulder_falls_per_env": None,
+        "episodes_per_env": None,
         "foot_ids": None,
         "foot_names": None,
         "foot_touchdowns": None,
         "foot_contact_steps": None,
+        "foot_touchdowns_per_env": None,
+        "foot_contact_steps_per_env": None,
         "foot_z": None,
         "foot_in_contact": None,
         "arm_ids": None,
         "arm_names": None,
+        "foot_body_ids": None,
+        "foot_tip_offset": None,
+        "knee_body_ids": None,
+        "knee_names": None,
+        "impact_sum_frames": [],
+        "impact_count_frames": [],
         "knee_z": None,
         "knee_backward_mask": None,
         "knee_forward_mask": None,
@@ -779,6 +1089,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         evaluate_step(env, obs, actions, rewards, dones, extras, step, state)
 
     results = compute_results(env, state)
+    if delay_wrapper is not None:
+        results["action_delay"] = describe_delay_regime(delay_wrapper)
+        per_lag = compute_per_lag_results(env, state, delay_wrapper)
+        if per_lag:
+            results["metrics_per_lag"] = per_lag
+            print_per_lag_table(per_lag)
     print_dict(results)
     save_results(results, os.path.join(log_dir, "eval"))
     save_torques_csv(state, os.path.join(log_dir, "eval"))

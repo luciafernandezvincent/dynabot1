@@ -1,0 +1,36 @@
+# exp_407_shoulder_10 — base: champion.yaml (= exp_405_vertical_freedom, 0.5675)
+#
+# Cambio unico: `joint_deviation_shoulder` -0.5 -> -1.0.
+#
+# RAZON: exp_404 y exp_406 cerraron las dos vias directas para subir la altura de pata. Premiar la
+# altura del pie (`foot_clearance`) la consigue PLEGANDO la pata: front_right subio el pie a 32.5 mm
+# y hundio la rodilla a 56.0 mm. Igualar los tiempos de aire (`air_time_variance`) es ciego a la
+# altura y bajo las cuatro patas a 6-27 mm.
+#
+# Queda la via indirecta, que es ademas la unica con precedente de exito. Las corridas que llegaron
+# a los despejes que el usuario recuerda (tanda raiz) usaban esta receta:
+#
+#   exp_028_airtime5_plus_vert   53.9 mm   shoulder -1.0 + air_time 5.0 + lin_vel_z -0.5
+#   exp_027_airtime3_plus_vert   45.5 mm   shoulder -1.0 + air_time 3.0 + lin_vel_z -0.5
+#   exp_023_vertical_freedom               shoulder -1.0 + air_time 1.5 + lin_vel_z -0.5
+#
+# exp_405 ya tiene air_time (6.0) y lin_vel_z (-0.5). La unica diferencia estructural con esa
+# familia es el hombro: -0.5 contra -1.0. Este experimento cierra esa diferencia.
+#
+# MECANISMO: encaja con lo que enseno exp_404. Si el codo va plegado, subir el pie es barato
+# plegando mas, y por eso premiar altura fracasa. `joint_deviation_shoulder` castiga la desviacion
+# de la junta de abduccion respecto de la pose default, o sea hace CARO el plegado. Con el plegado
+# caro, la unica forma de levantar el pie es levantar el miembro entero. No se premia altura en
+# ningun lado: se cierra el atajo.
+#
+# BONUS ESPERADO: el hombro es tambien la palanca que subio front_right en exp_402 (80.6 -> 93.3 mm
+# con -0.5). exp_405 lo dejo en 82.2 mm. Duplicar el peso deberia recuperar eso.
+#
+# RIESGO: exp_020 (tanda raiz, w=-1.0) endereza mas pero acorta el swing a 132 ms. En esta tanda el
+# contrapeso ya esta puesto: `feet_air_time` en 6.0, que es lo que compro la cadencia en exp_403.
+# exp_028 corrio justamente shoulder -1.0 CON air_time 5.0 y saco 2.11 Hz, asi que la combinacion
+# esta probada.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -1.0

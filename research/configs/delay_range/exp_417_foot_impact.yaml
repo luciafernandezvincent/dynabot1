@@ -1,0 +1,5 @@
+# base champion_v3. Pisadas suaves: foot_impact -0.005 (exceso sobre 50 N).
+env:
+  rewards:
+    foot_impact:
+      weight: -0.005

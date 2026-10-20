@@ -1,0 +1,32 @@
+# Campeon vigente de la tanda `delay_range`: exp_405_vertical_freedom (score 0.5675).
+#
+# Config EFECTIVA COMPLETA, no un delta. Historia de la linea:
+#   baseline  0.5409  receta de exp_213 (delay_bien) bajo delay variable
+#   exp_401   0.5667  + red [512,256,128]        <- arreglo los bordes del rango
+#   exp_402   0.5657  + joint_deviation_shoulder <- arreglo la postura de front_right
+#   exp_403   0.5626  + feet_air_time 6.0        <- recupero la cadencia que costo exp_402
+#   exp_405   0.5675  + lin_vel_z_l2 -0.5        <- cadencia 2.21 Hz y paso 304 mm
+# (exp_404, foot_clearance 0.5, NO entro: sube el pie plegando la pata y hunde la rodilla.)
+#
+# OJO: encadenar deltas con --base NO funciona; por eso este archivo tiene la config completa.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    joint_deviation_shoulder:
+      weight: -0.5
+    gait:
+      weight: 3.5
+    feet_air_time:
+      weight: 6.0
+    action_rate_l2:
+      weight: -0.3
+    lin_vel_z_l2:
+      weight: -0.5
+agent:
+  algorithm:
+    num_learning_epochs: 8
+  actor:
+    hidden_dims: [512, 256, 128]
+  critic:
+    hidden_dims: [512, 256, 128]

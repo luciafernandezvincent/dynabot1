@@ -1,0 +1,26 @@
+# exp_401_bigger_net — base: baseline_delay_range (0.5409)
+#
+# Cambio unico: red del actor y del critico [128,128,128] -> [512,256,128] (la que usa la config
+# `rough`). No se toca ningun reward.
+#
+# RAZON: el desglose por lag de la baseline dice que el problema NO es el nivel de retardo sino su
+# VARIEDAD. Con lag 5 y 6 la politica levanta front_left a 248-265 mm; con lag 4 y 7 lo deja en
+# 64-68 mm, y las caidas se concentran en lag 4 (3 de 5). O sea: aprendio el centro de la
+# distribucion y no llega a los bordes. Eso es un sintoma de capacidad/cobertura, no de shaping de
+# rewards — y los rewards ya son la receta campeona, ajustada durante 15 experimentos.
+#
+# Bajo retardo variable la politica tiene trabajo nuevo que en `delay_bien` no tenia: inferir su
+# propio lag a partir de las 7 acciones pendientes (84 dims de observacion) y de lo que sale por
+# joint_pos/joint_vel. La red [128,128,128] de la config flat nunca tuvo que gastar capacidad en
+# eso. Es la primera hipotesis del PLAN que no toca la marcha ya ganada (2.55 Hz, paso 266 mm).
+#
+# OJO CON EL CAMPO: es agent.actor.hidden_dims / agent.critic.hidden_dims, NO
+# agent.policy.actor_hidden_dims. En rsl-rl-lib 5.0.1 el shim handle_deprecated_rsl_rl_cfg usa
+# `policy` para poblar `actor`/`critic` y despues LO VACIA, antes de que se aplique el YAML: por
+# eso exp_008 entreno la red chica y quedo marcado "ok" igual. Verificado en el agent.yaml de la
+# baseline: policy -> {} y actor.hidden_dims -> [128,128,128].
+agent:
+  actor:
+    hidden_dims: [512, 256, 128]
+  critic:
+    hidden_dims: [512, 256, 128]

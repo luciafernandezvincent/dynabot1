@@ -1,0 +1,6 @@
+# base champion_v3. Anti-caida: flat_orientation_l2 -1e-4 -> -1.0 (torso nivelado,
+# el hombro toca el piso cuando el cuerpo rola).
+env:
+  rewards:
+    flat_orientation_l2:
+      weight: -1.0

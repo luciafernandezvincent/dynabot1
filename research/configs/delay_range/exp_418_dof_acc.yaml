@@ -1,0 +1,5 @@
+# base champion_v3. Suavidad articular: dof_acc_l2 -2.5e-7 -> -1e-6.
+env:
+  rewards:
+    dof_acc_l2:
+      weight: -1.0e-6

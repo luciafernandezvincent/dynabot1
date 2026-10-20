@@ -1,0 +1,27 @@
+# Campeon de MARCHA de la tanda `delay_range`: exp_403_shoulder_airtime (score 0.5626).
+#
+# No es el campeon por score (ese es exp_401, 0.5667), pero es la mejor configuracion para los
+# objetivos del usuario: tiene la postura de exp_402 (front_right 92.3/99.6 mm) y la marcha de
+# exp_401 (2.36 Hz, paso 284 mm, despeje 21.0 mm) al mismo tiempo. Pierde por score solo porque
+# `velocity_tracking` cayo 0.942 -> 0.931 y ese termino pesa 0.30.
+#
+# Config EFECTIVA COMPLETA. Es la base de exp_404 en adelante.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    joint_deviation_shoulder:
+      weight: -0.5
+    gait:
+      weight: 3.5
+    feet_air_time:
+      weight: 6.0
+    action_rate_l2:
+      weight: -0.3
+agent:
+  algorithm:
+    num_learning_epochs: 8
+  actor:
+    hidden_dims: [512, 256, 128]
+  critic:
+    hidden_dims: [512, 256, 128]

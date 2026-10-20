@@ -1,0 +1,7 @@
+# base champion_v2. foot_clearance ahora mide la PUNTA del pie (antes: la rodilla).
+env:
+  rewards:
+    foot_clearance:
+      weight: 0.5
+      params:
+        target_height: 0.06

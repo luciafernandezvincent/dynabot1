@@ -10,8 +10,9 @@ class ActionDelayWrapper:
     Wraps a vectorized environment to introduce action delay/latency.
 
     New actions are buffered and executed some steps later. The delay can be the same for every
-    environment, or sampled per-environment from a range so the policy learns to cope with a
-    spread of latencies (domain randomization) instead of a single fixed value.
+    environment, sampled per-environment from a range so the policy learns to cope with a spread
+    of latencies (domain randomization), or spread deterministically over that range with a fixed
+    number of envs per delay (``stratified``), which is what evaluation wants.
 
     Units: ``delay_steps`` and ``delay_range`` share one convention, where the applied lag is
     ``value - 1`` steps -- ``delay_steps=1`` is no delay and ``delay_steps=5`` means the action
@@ -21,6 +22,8 @@ class ActionDelayWrapper:
     Example:
         env = ActionDelayWrapper(env, delay_steps=5)                            # every env lags 4
         env = ActionDelayWrapper(env, delay_range=(3, 8), action_history_length=4)  # lags 2..7
+        env = ActionDelayWrapper(env, delay_range=(5, 8), action_history_length=7, stratified=True)
+        #   ^ envs split evenly over lags 4,5,6,7 and each keeps its lag for the whole run
     """
 
     def __init__(
@@ -31,6 +34,7 @@ class ActionDelayWrapper:
         default_action: str = "zeros",
         action_history_length: int | None = None,
         resample_on_reset: bool = True,
+        stratified: bool = False,
         log_interval: int | None = None,
     ):
         """
@@ -49,12 +53,19 @@ class ActionDelayWrapper:
                 the history_length of the `actions` ObsTerm in the env cfg. With a fixed delay it
                 defaults to delay_steps - 1 (the number of actions still pending); with
                 delay_range it has no sensible default and must be passed explicitly.
+            stratified: Instead of drawing at random, spread delay_range evenly and deterministically
+                over the envs (env i gets the i-th delay of the range, cycling), and keep each env on
+                its delay for the whole run. Use this for eval/play: the delay mix stops being a
+                source of run-to-run noise, and every metric can be grouped exactly by lag because
+                the env -> lag map is known and constant. Forces resample_on_reset off.
             resample_on_reset: Draw a new delay for an env each time its episode restarts
             log_interval: Print the lag distribution every N steps (None disables)
         """
         self.env = env
         self.default_action = default_action
-        self.resample_on_reset = resample_on_reset
+        self.stratified = bool(stratified)
+        # a stratified split only stays a split if nobody re-draws it mid-run
+        self.resample_on_reset = resample_on_reset and not self.stratified
         self.log_interval = log_interval
         self.step_count = 0
 
@@ -71,6 +82,8 @@ class ActionDelayWrapper:
                     "delay would overwrite the wrong number of observation dims."
                 )
         else:
+            if self.stratified:
+                raise ValueError("stratified=True needs a delay_range; a fixed delay has nothing to spread")
             self.delay_range = None
             self.max_lag = max(0, int(delay_steps) - 1)
             if action_history_length is None:
@@ -100,6 +113,11 @@ class ActionDelayWrapper:
         """Enough slots for the largest lag and for the observation history, plus the newest entry."""
         return max(self.max_lag, self.action_history_length - 1, 0) + 1
 
+    def _lag_values(self, device) -> torch.Tensor:
+        """Every lag the configured range covers, ascending. lag = value - 1."""
+        low, high = self.delay_range
+        return torch.arange(low - 1, high, dtype=torch.long, device=device)
+
     def _sample_lags(self, count: int, device) -> torch.Tensor:
         """Draw `count` lags in steps: from the configured range, or the single fixed value."""
         if self.delay_range is None:
@@ -108,12 +126,25 @@ class ActionDelayWrapper:
         # lag = value - 1, and randint's upper bound is exclusive, so [low-1, high) covers it
         return torch.randint(low - 1, high, (count,), dtype=torch.long, device=device)
 
+    def _assign_lags(self, num_envs: int, device) -> torch.Tensor:
+        """Lag of every env at startup: a deterministic even split if stratified, else a draw.
+
+        The split is interleaved (env i -> lag i % n) rather than blocked (first chunk of envs on
+        the lowest lag): env index correlates with position in the scene grid and with whatever a
+        curriculum keys off, so handing a whole contiguous block the same lag would confound the
+        lag with those. Interleaving spreads each lag across the whole population.
+        """
+        if not self.stratified:
+            return self._sample_lags(num_envs, device)
+        values = self._lag_values(device)
+        return values.repeat((num_envs + values.numel() - 1) // values.numel())[:num_envs]
+
     def _lazy_init(self, actions: torch.Tensor) -> None:
         num_envs = actions.shape[0]
         self.buffer = torch.zeros(
             (self._buffer_len, *actions.shape), dtype=actions.dtype, device=actions.device
         )
-        self.lags = self._sample_lags(num_envs, actions.device)
+        self.lags = self._assign_lags(num_envs, actions.device)
         self.steps_since_reset = torch.zeros(num_envs, dtype=torch.long, device=actions.device)
         self.head = 0
 
@@ -239,8 +270,18 @@ class ActionDelayWrapper:
         if self.lags is None:
             return "not initialized yet"
         lags = self.lags.float()
-        kind = f"randomized {self.delay_range}" if self.delay_range else "fixed"
+        if self.delay_range is None:
+            kind = "fixed"
+        else:
+            kind = f"{'stratified' if self.stratified else 'randomized'} {self.delay_range}"
         return f"lag min={int(lags.min())} max={int(lags.max())} mean={lags.mean():.2f} steps ({kind})"
+
+    def lag_counts(self) -> dict[int, int]:
+        """How many envs are on each lag, for the run record. Constant when stratified."""
+        if self.lags is None:
+            return {}
+        values, counts = torch.unique(self.lags, return_counts=True)
+        return {int(v): int(c) for v, c in zip(values.tolist(), counts.tolist())}
 
     def get_delay_steps(self):
         """Current lag per env, in steps."""

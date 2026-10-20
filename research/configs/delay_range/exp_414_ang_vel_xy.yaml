@@ -1,0 +1,5 @@
+# base champion_v3. Anti-caida + suavidad: ang_vel_xy_l2 -0.05 -> -0.2 (menos rolido/cabeceo).
+env:
+  rewards:
+    ang_vel_xy_l2:
+      weight: -0.2

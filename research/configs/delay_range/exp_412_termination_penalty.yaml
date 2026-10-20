@@ -1,0 +1,6 @@
+# base champion_v3. Anti-caida: termination_penalty -200 (termino nuevo, cobra cada caida).
+# Las 2 caidas de exp_409 fueron shoulder_contact; hasta ahora caerse no tenia costo explicito.
+env:
+  rewards:
+    termination_penalty:
+      weight: -200.0

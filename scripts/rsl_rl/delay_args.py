@@ -28,6 +28,16 @@ def add_delay_args(parser: argparse.ArgumentParser) -> None:
         ),
     )
     parser.add_argument(
+        "--action-delay-stratified", action="store_true",
+        help=(
+            "With --action-delay-range, split the envs evenly and deterministically over the "
+            "range (env i gets the i-th delay, cycling) instead of drawing at random, and keep "
+            "each env on its delay for the whole run. Use it for eval/play: the delay mix stops "
+            "being run-to-run noise and every metric can be grouped exactly by lag. Training "
+            "wants the random draw, so leave it off there."
+        ),
+    )
+    parser.add_argument(
         "--action-history-length", type=int, default=None,
         help=(
             "Number of raw pending actions fed back into the observation. Must match the "
@@ -74,13 +84,18 @@ def maybe_wrap_with_delay(env, env_cfg, args_cli, log=print):
     )
 
     delay_range_arg = getattr(args_cli, "action_delay_range", None)
+    stratified = bool(getattr(args_cli, "action_delay_stratified", False))
     if delay_range_arg is not None:
         low, high = parse_delay_range(delay_range_arg)
-        env = ActionDelayWrapper(env, delay_range=(low, high), action_history_length=history_length)
+        env = ActionDelayWrapper(
+            env, delay_range=(low, high), action_history_length=history_length, stratified=stratified
+        )
         log(
-            f"[INFO] Randomized action delay: {low}..{high} "
+            f"[INFO] {'Stratified' if stratified else 'Randomized'} action delay: {low}..{high} "
             f"(lag {low - 1}..{high - 1} steps), action_history_length={history_length}"
         )
+        if stratified:
+            log(f"[INFO] Envs per lag: {env.lag_counts() or 'assigned on the first step'}")
     elif args_cli.action_delay > 1:
         env = ActionDelayWrapper(
             env, delay_steps=args_cli.action_delay, action_history_length=history_length

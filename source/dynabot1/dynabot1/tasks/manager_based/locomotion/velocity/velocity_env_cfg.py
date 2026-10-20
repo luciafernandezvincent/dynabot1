@@ -366,7 +366,8 @@ class RewardsCfg:
         func=mdp.knee_clearance_reward,
         weight=0.0,
         params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*arm_link"),
+            # fix 21/09/2026: .*hand_link (su origen es la rodilla real); .*arm_link era la cadera
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*hand_link"),
             "min_height": 0.11,
             "std": 0.005,
             "tanh_mult": 2.0,
@@ -389,6 +390,12 @@ class RewardsCfg:
         weight=0.0,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_shoulder"])},
     )
+
+    # peso 0: disponible para tunear via YAML. Pedido del usuario (21/09/2026): que no se caiga.
+    # Cobra una vez por episodio terminado por base_contact o shoulder_contact (no por time_out).
+    # Hasta ahora caerse solo costaba el reward que se dejaba de ganar: con 0.2-0.4% de caidas por
+    # episodio la senal era casi nula.
+    termination_penalty = RewTerm(func=mdp.is_terminated, weight=0.0)
 
     # -- optional penalties
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-1.0e-4)#-1.0e-5)

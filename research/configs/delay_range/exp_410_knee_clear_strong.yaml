@@ -1,0 +1,7 @@
+# base champion_v2. Dosis alta de knee_clearance (rodilla real) con umbral 0.12 m.
+env:
+  rewards:
+    knee_clearance:
+      weight: 1.5
+      params:
+        min_height: 0.12

@@ -1,0 +1,32 @@
+# champion_v3 = exp_409_knee_clear_real (0.5616), elegido por el usuario mirando el video (21/09/2026):
+# mas suave que exp_402 (impacto 88 vs 93 N, orientacion mas estable) pero con 2 caidas/1000 ep.
+# = champion_v2 + knee_clearance 0.5 (rodilla real, min 0.10).
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 3.5
+    feet_air_time:
+      weight: 4.0
+    action_rate_l2:
+      weight: -0.3
+    joint_deviation_shoulder:
+      weight: -0.5
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.1
+agent:
+  algorithm:
+    num_learning_epochs: 8
+  actor:
+    hidden_dims:
+    - 512
+    - 256
+    - 128
+  critic:
+    hidden_dims:
+    - 512
+    - 256
+    - 128

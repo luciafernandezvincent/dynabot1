@@ -1,0 +1,8 @@
+# base champion_v3. COMBO de los dos ganadores de la ola: ang_vel_xy_l2 -0.2 (exp_414, 0.5747, torso
+# mas estable hacia adelante) + action_rate_l2 -0.5 (exp_416, 0.5709, patas mas suaves y paso mas largo).
+env:
+  rewards:
+    ang_vel_xy_l2:
+      weight: -0.2
+    action_rate_l2:
+      weight: -0.5

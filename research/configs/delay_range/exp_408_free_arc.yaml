@@ -1,0 +1,31 @@
+# exp_408_free_arc — base: champion.yaml (= exp_405_vertical_freedom, 0.5675)
+#
+# Cambio unico: `joint_deviation` (global) -0.2 -> 0. El quirurgico de hombro queda en -0.5.
+#
+# RAZON: tres experimentos seguidos fallaron en subir el despeje (exp_404 foot_clearance,
+# exp_406 air_time_variance, exp_407 shoulder -1.0). El diagnostico estaba mal: no faltaba un
+# termino que empujara altura, sobraba uno que la aplasta.
+#
+# La receta de la tanda raiz que dio los despejes que el usuario recuerda NO tiene joint_deviation
+# global:
+#   exp_028   53.9 mm   shoulder -1.0, air_time 5.0, lin_vel_z -0.5     <- sin joint_deviation
+#   exp_027   45.5 mm   shoulder -1.0, air_time 3.0, lin_vel_z -0.5     <- sin joint_deviation
+#   nuestra linea  14-22 mm   ...mismas piezas MAS joint_deviation -0.2
+#
+# El comentario del env_cfg (velocity_env_cfg.py:381-386) explica el mecanismo y ya tiene el numero
+# medido: el termino quirurgico de hombro existe justamente porque penalizar TODAS las juntas
+# castiga tambien `shoulder_to_arm` y `arm_to_hand`, "las que hacen el arco del paso", y eso llevo
+# el despeje de 40.6 a 10.3 mm en exp_016/017.
+#
+# `joint_deviation` -0.2 entro en esta linea por herencia: viene de exp_201 en `delay_bien`, donde
+# su trabajo era sacar la pata de la posicion plegada (rodilla 54.9 -> 65.3 mm). Ese trabajo hoy lo
+# hace `joint_deviation_shoulder`, que ataca la junta de abduccion sin tocar las del arco. El
+# global quedo cumpliendo solo su efecto colateral.
+#
+# RIESGO: es el termino que primero levanto la rodilla en `delay_bien`. Sacarlo puede devolver algo
+# de plegado y bajar front_right (hoy 82.2 mm). La apuesta es que el quirurgico alcanza: en exp_402
+# fue el que llevo front_right de 80.6 a 93.3 mm, con el global ya presente en las dos corridas.
+env:
+  rewards:
+    joint_deviation:
+      weight: 0.0

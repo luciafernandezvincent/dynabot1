@@ -1,0 +1,31 @@
+# exp_402_shoulder_dev — base: exp_401_bigger_net (0.5667)
+#
+# Cambio unico: `joint_deviation_shoulder` 0 -> -0.5. Todo lo demas queda igual (red grande,
+# joint_deviation global -0.2, gait 3.5, feet_air_time 4.0, action_rate_l2 -0.3, epochs 8).
+#
+# RAZON: despues de exp_401 queda UN solo defecto. front_right es la unica pata por debajo de los
+# 100 mm (80.6 atras, 84.7 adelante) mientras las otras tres estan en 222-257 mm, y es plana en los
+# cuatro lags, o sea que no es un problema de retardo. Y la junta que mas se desvia en esa pata es
+# `base_to_front_right_shoulder` (0.1289 rad, segunda peor de todo el robot): la de abduccion, la
+# que define si el codo va plegado hacia adentro.
+#
+# POR QUE ESTE TERMINO Y NO joint_deviation GLOBAL -0.4: subir el global es la palanca de exp_212,
+# y tiene un costo medido que aca es inaceptable. Penalizar TODAS las juntas endereza la postura
+# pero achica el paso -exp_016/017: despeje 40.6 -> 10.3 mm, swing 197 -> 134 ms, zancada
+# 2.56 -> 4.54 Hz, "pasitos apurados y rasantes"- y exp_212 lo repitio (zancada 3.38 -> 3.62 Hz y
+# dos patas caidas hacia adelante). La marcha lenta de paso largo (2.35 Hz, 292 mm) es justo lo que
+# esta tanda gano y no se quiere devolver.
+#
+# `joint_deviation_shoulder` es la variante quirurgica del mismo mecanismo: penaliza la desviacion
+# SOLO en las juntas `base_to_*_shoulder`, y deja libres `shoulder_to_arm` y `arm_to_hand`, que son
+# las que hacen el arco del paso. Ataca exactamente la junta que el diagnostico senala, sin tocar
+# la amplitud.
+#
+# DOSIS: -0.5 es la de exp_019 (tanda sin_delay), donde recupero el despeje (41.2 mm) mientras
+# enderezaba; -1.0 (exp_020) enderezo mas pero acorto el swing a 132 ms. Ojo: esos numeros vienen
+# de OTRO regimen fisico (delay 1, actuadores 14.5 Nm), asi que -0.5 es un punto de partida
+# razonable, no una dosis calibrada para este regimen.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -0.5

@@ -1,0 +1,36 @@
+# Override de ARQUITECTURA para play.py / eval.py / play_delay.py.
+#
+# Por que hace falta: esos scripts reconstruyen `agent_cfg` desde el default de la tarea
+# (AnymalDFlatPPORunnerCfg, red [128,128,128]) y NUNCA leen el checkpoint, asi que no tienen forma
+# de saber que la corrida que estan por cargar tiene otra red. El sintoma es:
+#
+#   RuntimeError: Error(s) in loading state_dict for MLPModel:
+#     size mismatch for mlp.0.weight: copying a param with shape torch.Size([512, 120])
+#     from checkpoint, the shape in current model is torch.Size([128, 120]).
+#
+# Si el primer numero (120) coincide y los otros no, es la RED, no las observaciones. Si no
+# coincide el 120, es la observacion y este archivo no lo arregla (ahi el problema es la rama o el
+# history_length de `actions`).
+#
+# Uso:
+#   python scripts/rsl_rl/play_delay.py --task=Dyna1-Flat-v0 --num_envs=32 --action-delay 5 \
+#       --load_run exp_414_ang_vel_xy --experiment_config=scripts/rsl_rl/experiment_configs/net_512.yaml
+#
+# OJO: el campo correcto es `agent.actor.hidden_dims`, NO `agent.policy.actor_hidden_dims`. Ese
+# ultimo esta deprecado en rsl-rl 5.x: el shim `handle_deprecated_rsl_rl_cfg` corre ANTES de
+# aplicar este YAML, usa `policy` para poblar `actor`/`critic` y despues VACIA `policy`, asi que un
+# override sobre `policy` se aplica a un campo ya descartado, sin error ni warning. Eso costo tres
+# relanzamientos de exp_008 en agosto.
+#
+# Para generar este archivo para cualquier corrida, sin escribirlo a mano:
+#   python - <<'EOF'
+#   import yaml
+#   RUN="exp_414_ang_vel_xy"
+#   a=yaml.unsafe_load(open(f"logs/rsl_rl/anymal_d_flat/{RUN}/params/agent.yaml"))
+#   print(yaml.dump({"agent":{k:{"hidden_dims":a[k]["hidden_dims"]} for k in ("actor","critic")}}))
+#   EOF
+agent:
+  actor:
+    hidden_dims: [512, 256, 128]
+  critic:
+    hidden_dims: [512, 256, 128]

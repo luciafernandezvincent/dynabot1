@@ -1,0 +1,8 @@
+# base champion_v2. knee_clearance ahora mide la rodilla REAL (origen de hand_link).
+# Las rodillas traseras bajan a 75-80 mm hacia atras; premiar mantenerlas > 100 mm.
+env:
+  rewards:
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.10

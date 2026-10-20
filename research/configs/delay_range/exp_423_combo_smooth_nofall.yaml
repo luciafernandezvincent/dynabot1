@@ -1,0 +1,10 @@
+# base champion_v3. exp_422 (ang_vel_xy -0.2 + action_rate -0.5) + termination_penalty -200 (exp_412:
+# 0 caidas en eval y rodillas traseras 75/62 mm). Objetivo: la marcha suave del combo sin caidas.
+env:
+  rewards:
+    ang_vel_xy_l2:
+      weight: -0.2
+    action_rate_l2:
+      weight: -0.5
+    termination_penalty:
+      weight: -200.0

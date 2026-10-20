@@ -1,0 +1,7 @@
+# base champion_v3. knee_clearance con std 0.005 -> 0.0005: en 409/410 el termino pagaba 1.499/1.5,
+# saturado. Con std chico una rodilla 5 cm bajo el umbral pesa de verdad (anti-plegado).
+env:
+  rewards:
+    knee_clearance:
+      params:
+        std: 0.0005

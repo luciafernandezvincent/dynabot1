@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import torch
+
+import isaaclab.utils.math as math_utils
 from typing import TYPE_CHECKING
 
 from isaaclab.assets import Articulation
@@ -98,6 +100,19 @@ def stand_still_penalty(
     return gate * (base_motion + joint_vel_scale * joint_motion)
 
 
+# Punta del pie en el frame de hand_link (malla de colision de dyna1_gazebo3.usd, igual en las 4 patas).
+# El origen de hand_link es la RODILLA (pivote arm_to_hand), no el pie. Mismo valor que eval.py.
+FOOT_TIP_OFFSET_IN_HAND_FRAME = (0.1863, -0.0413, 0.0)
+
+
+def foot_tip_pos_w(asset, body_ids) -> torch.Tensor:
+    """Posicion en mundo de la punta del pie de cada hand_link, (num_envs, num_feet, 3)."""
+    pos = asset.data.body_pos_w[:, body_ids]
+    quat = asset.data.body_quat_w[:, body_ids]
+    offset = torch.tensor(FOOT_TIP_OFFSET_IN_HAND_FRAME, device=pos.device).expand_as(pos)
+    return pos + math_utils.quat_apply(quat, offset)
+
+
 def foot_clearance_reward(
     env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, target_height: float, std: float, tanh_mult: float
 ) -> torch.Tensor:
@@ -109,8 +124,9 @@ def foot_clearance_reward(
     error respecto de una altura objetivo, pesado por la velocidad lateral del pie (para que solo
     aplique durante el swing, no en apoyo).
     """
+    # fix 21/09/2026: antes se usaba el origen de hand_link, que es la rodilla. Ahora es la punta del pie.
     asset = env.scene[asset_cfg.name]
-    foot_z_target_error = torch.square(asset.data.body_pos_w[:, asset_cfg.body_ids, 2] - target_height)
+    foot_z_target_error = torch.square(foot_tip_pos_w(asset, asset_cfg.body_ids)[..., 2] - target_height)
     foot_velocity_tanh = torch.tanh(tanh_mult * torch.norm(asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :2], dim=2))
     reward = foot_z_target_error * foot_velocity_tanh
     return torch.exp(-torch.sum(reward, dim=1) / std)
@@ -133,6 +149,9 @@ def knee_clearance_reward(
     concentrar la señal solo en el caso "para atras"), pero salio PEOR que v2 aislada (exp_041:
     0.4820 vs exp_039: 0.5284) -- se descarto y se volvio a v2.
     """
+    # fix 21/09/2026: la rodilla real es el origen de hand_link (pivote arm_to_hand). El origen de
+    # arm_link, que se usaba antes, es la cadera: siempre a la altura del torso, asi que este termino
+    # nunca tuvo senal. La config ahora apunta a .*hand_link.
     asset = env.scene[asset_cfg.name]
     knee_z = asset.data.body_pos_w[:, asset_cfg.body_ids, 2]
     violation_sq = torch.square(torch.clamp(min_height - knee_z, min=0.0))

@@ -1,0 +1,4 @@
+# base champion_v3. Hiperparametro: entropy_coef 0.005 -> 0.0025 (menos ruido de accion).
+agent:
+  algorithm:
+    entropy_coef: 0.0025

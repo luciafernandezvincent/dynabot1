@@ -50,7 +50,13 @@ RESEARCH_DIR = REPO_ROOT / "research"
 # "delay_best" (11/09/2026): mismo regimen fisico que delay_bien (delay 5, actuadores 9 Nm) pero con
 # la observacion nueva de historial de acciones (last_action x4 + ActionDelayWrapper reemplazandolo
 # por las acciones pendientes). Tanda con baseline propia; ver research/runs/delay_best/PLAN.md.
-VARIANT = "delay_best"
+#
+# "delay_range" (21/09/2026): el retardo deja de ser fijo. Cada env sortea su propio delay en
+# ACTION_DELAY_RANGE y lo re-sortea en cada episodio, asi que la politica tiene que ser robusta a
+# un retardo variable en vez de aprender a compensar uno solo. Train, eval y video corren con el
+# MISMO rango (si el eval fuera a delay fijo no estaria midiendo el regimen que se entreno).
+# Tanda nueva con baseline propia: los scores de delay_best (delay fijo 5) no son comparables.
+VARIANT = "delay_range"
 
 RESULTS_JSONL = RESEARCH_DIR / "runs" / VARIANT / "results.jsonl"
 RESULTS_MD = RESEARCH_DIR / "runs" / VARIANT / "RESULTS.md"
@@ -68,8 +74,18 @@ TRAIN_NUM_ENVS = 4096
 SEED = 42
 EVAL_NUM_ENVS = 1000
 EVAL_NUM_STEPS = 1000
-ACTION_DELAY = 5
-VIDEO_NUM_ENVS = 10  # perros en pantalla
+# Rango de retardo de accion, inclusive, en la misma unidad que --action-delay: delay N = lag N-1
+# pasos. (5, 8) => lag 4..7. Formato 'min,max' porque es lo que espera --action-delay-range.
+ACTION_DELAY_RANGE = (5, 8)
+ACTION_DELAY_RANGE_ARG = f"{ACTION_DELAY_RANGE[0]},{ACTION_DELAY_RANGE[1]}"
+# El TRAIN sortea el delay por env y lo re-sortea en cada episodio: ahi la aleatoriedad es el
+# punto (domain randomization). El EVAL y el VIDEO no: reparten los envs en partes iguales entre
+# los delays del rango y cada env se queda con el suyo toda la corrida. Con el sorteo aleatorio,
+# dos experimentos con el mismo seed no ven la misma mezcla de lags (los resets dependen de la
+# politica, que es justo lo que el experimento cambia), asi que parte de la diferencia de metricas
+# seria que lags salieron y no que receta es mejor. Con 1000 envs y 4 delays: 250 envs por lag.
+DELAY_STRATIFIED_ARG = "--action-delay-stratified"
+VIDEO_NUM_ENVS = 12  # perros en pantalla: multiplo de los 4 delays del rango, 3 por lag
 VIDEO_LENGTH_STEPS = 300  # 300 pasos * 0.02 s de step_dt = 6 s de video
 VIDEO_TIMEOUT_S = 900
 TRAIN_TIMEOUT_S = 5400
@@ -159,7 +175,9 @@ def write_hyperparams(run_dir: Path, name: str, config: dict, args, base: Path |
             "seed": args.seed,
             "eval_num_envs": EVAL_NUM_ENVS,
             "eval_num_steps": EVAL_NUM_STEPS,
-            "action_delay": ACTION_DELAY,
+            "action_delay_range": list(ACTION_DELAY_RANGE),
+            "action_delay_train": "sorteado por env, re-sorteado en cada episodio",
+            "action_delay_eval": "estratificado: partes iguales por delay, fijo toda la corrida",
         "variant": VARIANT,
             "experiment_name": EXPERIMENT_NAME,
         },
@@ -314,7 +332,10 @@ def write_results_table() -> None:
         "",
         "Generado por `research/run_experiment.py`. No editar a mano: se reescribe en cada experimento.",
         "",
-        f"Tanda `{VARIANT}`: action_delay = {ACTION_DELAY} (1 = sin retardo de accion). Los checkpoints "
+        f"Tanda `{VARIANT}`: action_delay sorteado por env en {ACTION_DELAY_RANGE[0]}..{ACTION_DELAY_RANGE[1]} "
+        f"(lag {ACTION_DELAY_RANGE[0] - 1}..{ACTION_DELAY_RANGE[1] - 1} pasos), re-sorteado cada episodio. "
+        f"El eval y el video reparten los envs en partes iguales entre los delays del rango y cada env "
+        f"conserva el suyo, para que la mezcla de lags no sea ruido entre experimentos. Los checkpoints "
         f"viven en `logs/rsl_rl/{EXPERIMENT_NAME}/` y los artefactos del runner en `research/runs/{VARIANT}/`.",
         "",
         f"Protocolo: `{TASK}`, {TRAIN_ITERATIONS} iters x {TRAIN_NUM_ENVS} envs, seed {SEED}, "
@@ -383,7 +404,8 @@ def record_video(
         f"--load_run={name}",
         f"--num_envs={VIDEO_NUM_ENVS}",
         f"--seed={seed}",
-        f"--action-delay={ACTION_DELAY}"
+        f"--action-delay-range={ACTION_DELAY_RANGE_ARG}",
+        DELAY_STRATIFIED_ARG,
     ]
     if experiment_config is not None:
         video_cmd.append(f"--experiment_config={experiment_config}")
@@ -521,7 +543,7 @@ def main() -> int:
         f"--name={name}",
         f"--seed={args.seed}",
         f"--experiment_config={resolved_path}",
-        f"--action-delay={ACTION_DELAY}"
+        f"--action-delay-range={ACTION_DELAY_RANGE_ARG}",
     ]
     eval_cmd = [
         sys.executable, "scripts/rsl_rl/eval.py",
@@ -532,7 +554,8 @@ def main() -> int:
         f"--num_steps={EVAL_NUM_STEPS}",
         f"--seed={args.seed}",
         f"--experiment_config={resolved_path}",
-        f"--action-delay={ACTION_DELAY}",
+        f"--action-delay-range={ACTION_DELAY_RANGE_ARG}",
+        DELAY_STRATIFIED_ARG,
     ]
 
     if args.dry_run:
@@ -552,7 +575,8 @@ def main() -> int:
         "iterations": args.iterations,
         "num_envs": args.num_envs,
         "seed": args.seed,
-        "action_delay": ACTION_DELAY,
+        "action_delay_range": list(ACTION_DELAY_RANGE),
+        "action_delay_eval_stratified": True,
         "judge_hashes": judge_hashes(),
         "variant": VARIANT,
     }

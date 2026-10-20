@@ -1,0 +1,33 @@
+# champion_v4 = exp_414_ang_vel_xy (0.5747, mejor score de delay_range con metricas v2).
+# = champion_v3 (exp_409) + ang_vel_xy_l2 -0.2.
+agent:
+  actor:
+    hidden_dims:
+    - 512
+    - 256
+    - 128
+  algorithm:
+    num_learning_epochs: 8
+  critic:
+    hidden_dims:
+    - 512
+    - 256
+    - 128
+env:
+  rewards:
+    action_rate_l2:
+      weight: -0.3
+    feet_air_time:
+      weight: 4.0
+    gait:
+      weight: 3.5
+    joint_deviation:
+      weight: -0.2
+    joint_deviation_shoulder:
+      weight: -0.5
+    knee_clearance:
+      params:
+        min_height: 0.1
+      weight: 0.5
+    ang_vel_xy_l2:
+      weight: -0.2

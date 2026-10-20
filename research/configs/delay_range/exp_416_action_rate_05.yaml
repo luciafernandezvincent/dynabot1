@@ -1,0 +1,5 @@
+# base champion_v3. Suavidad: action_rate_l2 -0.3 -> -0.5.
+env:
+  rewards:
+    action_rate_l2:
+      weight: -0.5

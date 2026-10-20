@@ -1,0 +1,4 @@
+# base champion_v3. Hiperparametro: gamma 0.99 -> 0.995 (ve mas lejos las consecuencias de una caida).
+agent:
+  algorithm:
+    gamma: 0.995

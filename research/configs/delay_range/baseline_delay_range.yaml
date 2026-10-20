@@ -1,0 +1,43 @@
+# baseline_delay_range - punto de partida de la tanda `delay_range` (21/09/2026)
+#
+# NO son los defaults del codigo: es la mejor receta MEDIDA hasta ahora, re-medida bajo el
+# retardo variable. La tanda `delay_best` no dejo ninguna medicion (su baseline se corto a los
+# 42 s de entrenamiento, sin eval), asi que la referencia valida es `delay_bien`, que corrio el
+# mismo regimen fisico (delay 5, actuadores 9 Nm) con delay FIJO.
+#
+# Receta = exp_213_lento_gait_medio (`research/configs/delay_bien/champion_marcha.yaml`),
+# score 0.5707 en delay_bien. Se elige sobre el campeon de score exp_207_action_rate (0.5728)
+# porque la diferencia (+0.0021) es del orden del ruido y exp_213 gana en los tres objetivos
+# que pidio el usuario:
+#
+#   |                        | exp_207 | exp_213 |
+#   | zancada                | 3.97 Hz | 3.55 Hz |  <- marcha lenta
+#   | rodilla atras / adel   | 119/124 | 114/126 |  <- las 8 rodillas >114 mm en exp_213
+#   | suavidad orientacion   | 0.114   | 0.121   |  <- marcha suave
+#   | seguimiento velocidad  | 0.942   | 0.951   |
+#
+# Que hace cada termino (medido en delay_bien, ver BITACORA de esa tanda):
+#   joint_deviation -0.2   primera palanca contra la pata plegada (rodilla 54.9 -> 65.3 mm)
+#   gait 3.5               la palanca mas fuerte para la rodilla; 3.5 es el punto medio entre
+#                          lentitud (2.5 rompe la coordinacion) y coordinacion (5.0 apura la marcha)
+#   feet_air_time 4.0      contrapeso del pisoteo que introduce `gait`
+#   action_rate_l2 -0.3    suavidad y lentitud sin costo de score; bajo retardo importa mas
+#                          todavia, porque la politica no ve el efecto de su accion hasta N pasos
+#   num_learning_epochs 8  arreglo la coordinacion en marcha lenta (rodilla adel. 61 -> 109 mm)
+#
+# Hipotesis de la baseline: con delay sorteado en 5..8 (lag 4..7) esta receta pierde algo de
+# score y de coordinacion respecto de delay_bien. Cuanto pierde es justamente lo que esta tanda
+# tiene que medir, y es el numero contra el que se comparan exp_401..exp_410.
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 3.5
+    feet_air_time:
+      weight: 4.0
+    action_rate_l2:
+      weight: -0.3
+agent:
+  algorithm:
+    num_learning_epochs: 8

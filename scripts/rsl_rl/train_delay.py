@@ -218,7 +218,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
     # Apply action delay wrapper: randomized per env if a range was given, fixed otherwise
-    env = maybe_wrap_with_delay(env, env_cfg, args_cli, log=logger.info)
+    # log=print y no logger.info: hydra configura el logging y se traga los records de __main__,
+    # asi que con logger.info el regimen de retardo NO queda en train.log (se puede verificar en
+    # cualquier train.log de la tanda delay_bien: no aparece por ningun lado). Es justo el dato
+    # que despues hace falta para saber con que delay se entreno ese checkpoint.
+    env = maybe_wrap_with_delay(env, env_cfg, args_cli, log=print)
 
     start_time = time.time()
 

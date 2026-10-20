@@ -1,0 +1,32 @@
+# exp_403_shoulder_airtime — base: champion.yaml (= exp_401_bigger_net, 0.5667)
+#
+# Contiene DOS cambios respecto del champion, pero el delta real de este experimento es UNO SOLO:
+#   joint_deviation_shoulder -0.5  <- heredado de exp_402, ya medido
+#   feet_air_time 4.0 -> 6.0       <- EL CAMBIO DE ESTE EXPERIMENTO
+# Es decir: exp_402 + feet_air_time 6.0.
+#
+# RAZON: exp_402 demostro que el termino de hombro hace lo que promete (front_right 80.6 -> 93.3 mm
+# atras y 84.7 -> 100.7 adelante, las 8 rodillas arriba, desviacion de hombro -38%), pero lo paga
+# con la marcha: zancada 2.35 -> 2.75 Hz, paso 292 -> 246 mm, despeje 20.0 -> 16.7 mm. El score
+# quedo empatado porque las dos cosas se cancelan.
+#
+# `feet_air_time` es el contrapeso ya medido de ese costo. A estas frecuencias el termino es
+# NEGATIVO (en el log de exp_402: Episode_Reward/feet_air_time = -0.41), porque el threshold es
+# 0.5 s y los vuelos duran ~0.13 s: cada pisada resta. Subir el peso amplifica ese castigo por
+# pisada, o sea empuja a dar MENOS pasos, que es exactamente lo que se quiere recuperar. Es el
+# mecanismo que en exp_206 (delay_bien) llevo la zancada de 4.51 a 4.13 Hz subiendo el peso de 2.0
+# a 4.0, y el que en esta tanda produjo los 2.35 Hz.
+#
+# DOSIS: 6.0 es un 50% sobre el 4.0 actual. exp_215_airtime_6 en `delay_bien` iba a probar este
+# valor pero nunca llego a correr, asi que no hay medicion previa de esta dosis.
+#
+# RIESGO CONOCIDO: exp_208 (delay_bien) mostro que dos penalizaciones fuertes a la vez pueden hacer
+# mas barato arrastrar una pata que levantarla. Aca ya hay tres activas (joint_deviation,
+# joint_deviation_shoulder, action_rate_l2) y esta sube una cuarta. Si reaparece una pata baja
+# aislada, la lectura es esa y la dosis hay que bajarla.
+env:
+  rewards:
+    joint_deviation_shoulder:
+      weight: -0.5
+    feet_air_time:
+      weight: 6.0

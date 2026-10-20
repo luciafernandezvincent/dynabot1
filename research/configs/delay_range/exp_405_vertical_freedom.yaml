@@ -1,0 +1,29 @@
+# exp_405_vertical_freedom — base: champion_marcha.yaml (= exp_403, 0.5626)
+#
+# Cambio unico: `lin_vel_z_l2` -2.0 (defecto) -> -0.5. `foot_clearance` vuelve a 0.
+#
+# RAZON: exp_404 probo que `foot_clearance` sube el pie PLEGANDO la pata. front_right subio el pie
+# (27.6 -> 32.5 mm) y hundio la rodilla (92.3 -> 56.0 mm) en la misma corrida, y las patas traseras
+# directamente bajaron (14.7 -> 8.3 mm). Altura de pie y altura de rodilla estan acopladas por el
+# plegado: premiar solo el pie las enfrenta.
+#
+# La altura tiene que venir de levantar el MIEMBRO ENTERO, no de doblarlo. `lin_vel_z_l2` castiga
+# la velocidad vertical del cuerpo con peso -2.0: el robot aprende a no subir ni bajar el torso, y
+# un torso clavado a altura fija limita el recorrido disponible para la pata en vuelo. Relajarlo a
+# -0.5 ("libertad vertical") le devuelve ese recorrido.
+#
+# PRECEDENTE: es la palanca de exp_023/027/028 en la tanda raiz, y es la unica que llego a los
+# despejes que el usuario recuerda:
+#   exp_028 (air_time 5.0 + shoulder -1.0 + lin_vel_z -0.5)   53.9 mm   2.11 Hz
+#   exp_027 (air_time 3.0 + shoulder -1.0 + lin_vel_z -0.5)   45.5 mm   2.09 Hz
+#   exp_023 (air_time 1.5 + shoulder -1.0 + lin_vel_z -0.5)   despeje alto, misma familia
+# Los tres combinan lin_vel_z -0.5 con hombro fuerte y air_time alto, que es casi exactamente la
+# config de exp_403 (shoulder -0.5, air_time 6.0). Falta solo esta pieza.
+#
+# RIESGO: el termino existe para que el robot no rebote. Relajarlo puede subir el impacto (ya en
+# 94 N) y bajar `orientation_stability` (0.997), que pesa 0.13 del score. -0.5 es el valor probado;
+# no se baja mas.
+env:
+  rewards:
+    lin_vel_z_l2:
+      weight: -0.5

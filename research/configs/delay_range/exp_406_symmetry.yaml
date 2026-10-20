@@ -1,0 +1,31 @@
+# exp_406_symmetry — base: champion.yaml (= exp_405_vertical_freedom, 0.5675)
+#
+# Cambio unico: `air_time_variance` 0 -> -1.0.
+#
+# RAZON: el desglose por pie es el mismo en TODA la tanda. Las delanteras despegan ~30 mm y las
+# traseras 12-16 mm: la mitad del robot arrastra las patas, y el promedio de 22 mm lo esconde.
+#
+#   despeje pico (mm)   back_left  back_right  front_left  front_right
+#     exp_403              11.7       14.7        30.0        27.6
+#     exp_405              12.3       15.6        30.9        30.8
+#
+# Ningun termino activo penaliza ese reparto desigual. `gait` sincroniza CUANDO pisan las
+# diagonales, no CUANTO levantan. `foot_clearance` (exp_404) empeoro todo: subio las delanteras
+# plegando la pata y bajo las traseras a 8.3 mm.
+#
+# `air_time_variance` existe exactamente para esto. El comentario del env_cfg: "castiga que unas
+# patas trabajen mas que otras (en exp_001 la delantera izq despegaba 4x mas que la trasera der)".
+# Penaliza la VARIANZA de tiempo de aire entre patas, asi que no premia altura en ninguna pata
+# concreta -no hay nada que ganar plegando- sino que iguala el trabajo. Es la diferencia con
+# exp_404: aquel daba un objetivo que se podia cumplir haciendo trampa, este cierra la trampa.
+#
+# PRECEDENTE: exp_011_symmetry (tanda raiz), mismo peso -1.0, score 0.5768:
+#   back_left 24.6 | back_right 24.6 | front_left 65.9 | front_right 44.4
+# Las traseras a 24.6 mm, 60% mas que los 15 mm de hoy.
+#
+# RIESGO: igualar el trabajo puede lograrse bajando las delanteras en vez de subiendo las traseras.
+# Si el despeje promedio no sube pero la varianza cae, es eso, y el termino no sirve solo.
+env:
+  rewards:
+    air_time_variance:
+      weight: -1.0

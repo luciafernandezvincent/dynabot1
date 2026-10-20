@@ -1,0 +1,34 @@
+# exp_404_foot_clearance — base: champion_marcha.yaml (= exp_403, 0.5626)
+#
+# Cambio unico: `foot_clearance` 0 -> 0.5 (target_height 0.05).
+#
+# RAZON: el usuario mira los videos y dice que en `sin_delay` habia llegado a "un movimiento mas
+# real, que no movia las patas tan rapido". Contra los campeones de esa tanda, exp_403 YA esta
+# igual o mejor en cadencia (2.36 Hz vs 2.49) y en paso (284 vs 288 mm). Lo que falta es ALTURA:
+#
+#   exp_028_airtime5_plus_vert (raiz)  despeje 53.9 mm   zancada 2.11 Hz
+#   exp_027_airtime3_plus_vert (raiz)  despeje 45.5 mm   zancada 2.09 Hz
+#   exp_001_clearance_on       (raiz)  despeje 40.6 mm   zancada 2.56 Hz   score 0.5837
+#   exp_403                    (hoy)   despeje 21.0 mm   zancada 2.36 Hz
+#
+# Un pie que se levanta 21 mm va rasante aunque el paso sea largo y lento; uno de 40 mm hace un
+# arco visible. Esa es la diferencia que se percibe como "real".
+#
+# `foot_clearance` es el ataque directo: mide la ALTURA del pie contra un target, no la duracion
+# del vuelo. El propio comentario del env_cfg (velocity_env_cfg.py:275) explica por que
+# `feet_air_time` no alcanza: "un pie puede levantarse unos milimetros y satisfacer igual el umbral
+# de tiempo". Por eso existe este termino.
+#
+# DOSIS: 0.5 con target 0.05 m es exactamente la de exp_001_clearance_on, que dio 40.6 mm y el
+# mejor score de la tanda raiz (0.5837), y la de exp_111_foot_clearance en `sin_delay` (15.2 mm,
+# 0.5799). Es la dosis mas probada del proyecto.
+#
+# NO CONFUNDIR con `knee_clearance`, que fallo tres veces (exp_210, exp_036-039) porque devuelve un
+# escalar unico para las 4 patas. `foot_clearance` se evalua por pie (body_names ".*hand_link"), asi
+# que la senal le llega a la pata que arrastra.
+env:
+  rewards:
+    foot_clearance:
+      weight: 0.5
+      params:
+        target_height: 0.05
