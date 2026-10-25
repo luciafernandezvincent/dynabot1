@@ -12,6 +12,18 @@ import argparse
 import sys
 import traceback
 
+# ------------------------------------------------------------------ levantar la app
+# Tiene que ir ANTES de cualquier import de dynabot1/isaaclab: esos imports cargan el pxr de
+# usd-core (pip) y despues Kit choca con su propio USD y crashea al arrancar.
+from isaaclab.app import AppLauncher  # noqa: E402
+
+parser = argparse.ArgumentParser(description="Smoke test del actuador serie-elastico.")
+AppLauncher.add_app_launcher_args(parser)
+args_cli, _ = parser.parse_known_args()
+args_cli.headless = True
+app_launcher = AppLauncher(args_cli)
+simulation_app = app_launcher.app
+
 # ------------------------------------------------------------------ paso 0: nucleo, sin isaaclab
 print("=" * 72)
 print("[0] nucleo numerico (no necesita Isaac Lab)")
@@ -45,16 +57,6 @@ print(f"  resolve_per_joint(escalar) -> {resolve_per_joint(80.0, JOINTS, 2, 'cpu
 print(f"  frecuencia del modo k=80, J=0.03 -> {natural_frequency_hz(80.0, 0.03):.2f} Hz")
 print(f"  subpasos sugeridos (dt=0.005, kp=90) -> {recommended_substeps(80.0, 0.03, 0.005, 90.0)}")
 print()
-
-# ------------------------------------------------------------------ levantar la app
-from isaaclab.app import AppLauncher  # noqa: E402
-
-parser = argparse.ArgumentParser(description="Smoke test del actuador serie-elastico.")
-AppLauncher.add_app_launcher_args(parser)
-args_cli, _ = parser.parse_known_args()
-args_cli.headless = True
-app_launcher = AppLauncher(args_cli)
-simulation_app = app_launcher.app
 
 failures = []
 
@@ -228,8 +230,11 @@ def _():
 
     actuator.reset([1])
     joint_pos = torch.full((num_envs, num_joints), 0.3)
+    # objetivo = pata: si el reset sincronizo, el env 1 queda en equilibrio y no transmite nada.
+    # Con objetivo 0 el PD mueve el rotor dentro del mismo paso y el torque no da ~0 aunque el
+    # reset ande bien.
     action = ArticulationActions(
-        joint_positions=torch.zeros(num_envs, num_joints),
+        joint_positions=joint_pos.clone(),
         joint_velocities=torch.zeros(num_envs, num_joints),
         joint_efforts=None,
     )
