@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from isaaclab.actuators import IdealPDActuator, IdealPDActuatorCfg
+from isaaclab.actuators import DCMotorCfg, IdealPDActuator
 from isaaclab.utils import configclass
 
 from .series_elastic_core import (
@@ -91,6 +91,23 @@ class SeriesElasticActuator(IdealPDActuator):
         if not isinstance(limit, torch.Tensor):
             limit = resolve(cfg.effort_limit if cfg.effort_limit is not MISSING else 1.0e9, "effort_limit")
         self._motor_effort_limit = limit
+
+        # Curva par-velocidad del motor (DCMotorCfg). Se evalua sobre la velocidad del ROTOR
+        # dentro del integrador, no sobre la del eslabon: con un resorte en el medio, los dos
+        # giran distinto y el que trabaja contra su propia curva es el motor.
+        self._motor_saturation_effort = (
+            None if cfg.saturation_effort is MISSING or cfg.saturation_effort is None
+            else resolve(cfg.saturation_effort, "saturation_effort")
+        )
+        self._motor_velocity_limit = (
+            None if self._motor_saturation_effort is None
+            else resolve(cfg.velocity_limit, "velocity_limit")
+        )
+        if self._motor_velocity_limit is not None and (self._motor_velocity_limit <= 0.0).any():
+            raise ValueError(
+                "velocity_limit debe ser positivo en todas las juntas cuando se usa "
+                "saturation_effort: es el divisor de la curva par-velocidad."
+            )
 
         self._transmitted_effort_limit = (
             None if cfg.transmitted_effort_limit is None
@@ -184,6 +201,8 @@ class SeriesElasticActuator(IdealPDActuator):
             dt=self._dt,
             substeps=self._substeps,
             motor_effort_limit=self._motor_effort_limit,
+            motor_saturation_effort=self._motor_saturation_effort,
+            motor_velocity_limit=self._motor_velocity_limit,
         )
 
         # A la junta de PhysX solo le llega lo que transmite el resorte.
@@ -216,12 +235,18 @@ class SeriesElasticActuator(IdealPDActuator):
 
 
 @configclass
-class SeriesElasticActuatorCfg(IdealPDActuatorCfg):
+class SeriesElasticActuatorCfg(DCMotorCfg):
     """Configuracion del actuador serie-elastico.
 
     ``stiffness`` y ``damping`` (heredados) son las ganancias del lazo del SERVO, que actuan sobre
     el angulo del motor. ``spring_stiffness`` y ``spring_damping`` son las propiedades mecanicas de
     la transmision, y hay que medirlas: ver la nota de calibracion del modulo.
+
+    Hereda de :class:`DCMotorCfg` y no de ``IdealPDActuatorCfg`` para conservar
+    ``saturation_effort``, o sea la curva par-velocidad del motor: el techo de par baja a medida
+    que el rotor gira mas rapido, en vez de ser una constante. Importa para este robot, donde toda
+    la investigacion de torque se midio contra esa curva (effort_limit = saturation_effort = 9 Nm).
+    Dejarlo sin setear (``MISSING``) vuelve al techo plano ``effort_limit``.
     """
 
     class_type: type = SeriesElasticActuator

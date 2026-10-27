@@ -141,6 +141,10 @@ DYNABOT_1_CFG = ArticulationCfg(
             damping=5.5,
             friction=0.1,
             armature=0.03,
+            # misma magnitud fisica que armature: inercia del rotor reflejada a la
+            # salida. Con el default de 3e-5 el modo del resorte daba 379 Hz y el
+            # integrador pedia 60 subpasos por paso de fisica (entrenamiento 5x mas lento).
+            rotor_inertia=0.03,
         ),
         "shoulder_to_arm": SeriesElasticActuatorCfg(
             joint_names_expr=[".*shoulder_to_arm"],
@@ -151,6 +155,10 @@ DYNABOT_1_CFG = ArticulationCfg(
             damping=1.85,     # Aumentamos más que la rigidez para frenar el "pasarse"
             friction=0.0,
             armature=0.04,   # Un ligero aumento para dar realismo a la inercia del motor
+            # misma magnitud fisica que armature: inercia del rotor reflejada a la
+            # salida. Con el default de 3e-5 el modo del resorte daba 379 Hz y el
+            # integrador pedia 60 subpasos por paso de fisica (entrenamiento 5x mas lento).
+            rotor_inertia=0.04,
         ),
         "arm_to_hand": SeriesElasticActuatorCfg(
             joint_names_expr=[".*arm_to_hand"],
@@ -161,6 +169,10 @@ DYNABOT_1_CFG = ArticulationCfg(
             damping=3.5,
             friction=0.1,
             armature=0.03,
+            # misma magnitud fisica que armature: inercia del rotor reflejada a la
+            # salida. Con el default de 3e-5 el modo del resorte daba 379 Hz y el
+            # integrador pedia 60 subpasos por paso de fisica (entrenamiento 5x mas lento).
+            rotor_inertia=0.03,
         ),
         
     },

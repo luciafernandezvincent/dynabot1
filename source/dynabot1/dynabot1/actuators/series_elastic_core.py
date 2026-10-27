@@ -108,6 +108,8 @@ def integrate_series_elastic(
     dt: float,
     substeps: int = 1,
     motor_effort_limit: torch.Tensor | None = None,
+    motor_saturation_effort: torch.Tensor | None = None,
+    motor_velocity_limit: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Avanza el estado del motor un paso de fisica y devuelve el torque del resorte.
 
@@ -139,9 +141,25 @@ def integrate_series_elastic(
             # Donde el motor satura, su torque pasa a ser una constante: deja de aportar
             # amortiguamiento y su termino va entero a la parte explicita.
             motor_torque_raw = motor_stiff_torque + motor_damping * (target_vel - motor_vel)
-            saturated = motor_torque_raw.abs() > motor_effort_limit
+            if motor_saturation_effort is None:
+                # techo plano: |tau| <= effort_limit a cualquier velocidad
+                clamped = torch.clamp(motor_torque_raw, -motor_effort_limit, motor_effort_limit)
+            else:
+                # Curva par-velocidad del motor de CC, igual que DCMotor._clip_effort de Isaac Lab
+                # pero evaluada sobre la velocidad del ROTOR, no la del eslabon: en un actuador
+                # serie-elastico el que gira contra su propia curva es el motor, y entre motor y
+                # pata hay un resorte que los desacopla. Se recalcula en cada subpaso porque
+                # motor_vel cambia dentro del paso de fisica.
+                #
+                # La banda es asimetrica: acelerando (tau y vel del mismo signo) el techo baja con
+                # la velocidad; frenando (signos opuestos) el motor puede dar mas. Por eso se
+                # calculan max y min por separado en vez de un |tau| <= limite.
+                ratio = motor_vel / motor_velocity_limit
+                max_effort = torch.clamp(motor_saturation_effort * (1.0 - ratio), max=motor_effort_limit)
+                min_effort = torch.clamp(motor_saturation_effort * (-1.0 - ratio), min=-motor_effort_limit)
+                clamped = torch.clamp(motor_torque_raw, min=min_effort, max=max_effort)
+            saturated = clamped != motor_torque_raw
             if saturated.any():
-                clamped = torch.sign(motor_torque_raw) * motor_effort_limit
                 explicit_torque = torch.where(
                     saturated,
                     clamped - spring_stiff_torque + spring_damping * joint_vel,

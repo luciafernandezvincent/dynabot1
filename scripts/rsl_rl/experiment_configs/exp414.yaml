@@ -1,0 +1,31 @@
+env:
+  rewards:
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 3.5
+    feet_air_time:
+      weight: 4.0
+    action_rate_l2:
+      weight: -0.3
+    joint_deviation_shoulder:
+      weight: -0.5
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.1
+    ang_vel_xy_l2:
+      weight: -0.2
+agent:
+  algorithm:
+    num_learning_epochs: 8
+  actor:
+    hidden_dims:
+    - 512
+    - 256
+    - 128
+  critic:
+    hidden_dims:
+    - 512
+    - 256
+    - 128
