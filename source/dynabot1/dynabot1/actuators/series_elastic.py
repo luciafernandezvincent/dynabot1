@@ -226,16 +226,16 @@ class SeriesElasticActuatorCfg(IdealPDActuatorCfg):
 
     class_type: type = SeriesElasticActuator
 
-    dt: float = MISSING
+    dt: float = 1/200
     """Paso de integracion del estado del motor. Debe coincidir con ``sim.dt``."""
 
-    spring_stiffness: dict[str, float] | float = MISSING
+    spring_stiffness: dict[str, float] | float = 80.0
     """Rigidez de la transmision, en Nm/rad. Es mecanica, no una ganancia de control."""
 
     spring_damping: dict[str, float] | float = 0.0
     """Amortiguamiento de la transmision, en Nm*s/rad. Con 0 el modo no se apaga nunca."""
 
-    rotor_inertia: dict[str, float] | float = MISSING
+    rotor_inertia: dict[str, float] | float = 3e-5
     """Inercia del rotor reflejada a la salida, en kg*m^2. Define la frecuencia del modo."""
 
     substeps: int | None = None

@@ -32,6 +32,7 @@ from isaaclab.assets.articulation import ArticulationCfg
 from isaaclab.sensors import RayCasterCfg
 from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 
+from dynabot1.actuators.series_elastic import SeriesElasticActuatorCfg
 
 ##
 # Configuration
@@ -98,8 +99,40 @@ DYNABOT_1_CFG = ArticulationCfg(
     #         friction=0.1,
     #     ),
     # },
+        # actuators={
+        # "shoulder": DCMotorCfg(
+        #     joint_names_expr=[".*_shoulder"],
+        #     effort_limit=9.0,
+        #     saturation_effort=9.0,
+        #     velocity_limit=21.0,
+        #     stiffness=90.0,
+        #     damping=5.5,
+        #     friction=0.1,
+        #     armature=0.03,
+        # ),
+        # "shoulder_to_arm": DCMotorCfg(
+        #     joint_names_expr=[".*shoulder_to_arm"],
+        #     effort_limit=9.0,
+        #     saturation_effort=9.0,
+        #     velocity_limit=21.0,
+        #     stiffness=28,  # Aumentamos para que empiece a moverse más rápido
+        #     damping=1.85,     # Aumentamos más que la rigidez para frenar el "pasarse"
+        #     friction=0.0,
+        #     armature=0.04,   # Un ligero aumento para dar realismo a la inercia del motor
+        # ),
+        # "arm_to_hand": DCMotorCfg(
+        #     joint_names_expr=[".*arm_to_hand"],
+        #     effort_limit=9.0,
+        #     saturation_effort=9.0,
+        #     velocity_limit=21.0,
+        #     stiffness=100.0,
+        #     damping=3.5,
+        #     friction=0.1,
+        #     armature=0.03,
+        # ),
+
         actuators={
-        "shoulder": DCMotorCfg(
+        "shoulder": SeriesElasticActuatorCfg(
             joint_names_expr=[".*_shoulder"],
             effort_limit=9.0,
             saturation_effort=9.0,
@@ -109,7 +142,7 @@ DYNABOT_1_CFG = ArticulationCfg(
             friction=0.1,
             armature=0.03,
         ),
-        "shoulder_to_arm": DCMotorCfg(
+        "shoulder_to_arm": SeriesElasticActuatorCfg(
             joint_names_expr=[".*shoulder_to_arm"],
             effort_limit=9.0,
             saturation_effort=9.0,
@@ -119,7 +152,7 @@ DYNABOT_1_CFG = ArticulationCfg(
             friction=0.0,
             armature=0.04,   # Un ligero aumento para dar realismo a la inercia del motor
         ),
-        "arm_to_hand": DCMotorCfg(
+        "arm_to_hand": SeriesElasticActuatorCfg(
             joint_names_expr=[".*arm_to_hand"],
             effort_limit=9.0,
             saturation_effort=9.0,
