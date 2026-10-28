@@ -257,7 +257,7 @@ class SeriesElasticActuatorCfg(DCMotorCfg):
     spring_stiffness: dict[str, float] | float = 80.0
     """Rigidez de la transmision, en Nm/rad. Es mecanica, no una ganancia de control."""
 
-    spring_damping: dict[str, float] | float = 0.0
+    spring_damping: dict[str, float] | float = 0.15
     """Amortiguamiento de la transmision, en Nm*s/rad. Con 0 el modo no se apaga nunca."""
 
     rotor_inertia: dict[str, float] | float = 3e-5

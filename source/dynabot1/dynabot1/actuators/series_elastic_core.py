@@ -65,6 +65,32 @@ def resolve_per_joint(
     return out
 
 
+def motor_torque_bounds(
+    motor_vel: torch.Tensor,
+    effort_limit: torch.Tensor,
+    saturation_effort: torch.Tensor | None = None,
+    velocity_limit: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Techo y piso de par del motor a la velocidad actual del ROTOR.
+
+    Con ``saturation_effort`` y ``velocity_limit`` reproduce la curva par-velocidad de
+    :class:`DCMotor` de Isaac Lab: el par disponible cae linealmente con la velocidad y se acota
+    a ``effort_limit``. Sin ellos devuelve el techo plano ``+-effort_limit``.
+
+    A diferencia de ``DCMotor``, la curva se evalua con la velocidad del ROTOR y no la de la
+    junta: en un actuador serie-elastico son distintas, y la que determina el par disponible es
+    la del motor.
+    """
+    if saturation_effort is None or velocity_limit is None:
+        return -effort_limit, effort_limit
+
+    vel_at_effort_limit = velocity_limit * (1.0 + effort_limit / saturation_effort)
+    clipped_vel = torch.clip(motor_vel, -vel_at_effort_limit, vel_at_effort_limit)
+    top = saturation_effort * (1.0 - clipped_vel / velocity_limit)
+    bottom = saturation_effort * (-1.0 - clipped_vel / velocity_limit)
+    return torch.clip(bottom, min=-effort_limit), torch.clip(top, max=effort_limit)
+
+
 def natural_frequency_hz(spring_stiffness: float, rotor_inertia: float) -> float:
     """Frecuencia natural del modo motor-resorte, en Hz: f = sqrt(k/J) / 2*pi."""
     if rotor_inertia <= 0.0:
@@ -141,23 +167,14 @@ def integrate_series_elastic(
             # Donde el motor satura, su torque pasa a ser una constante: deja de aportar
             # amortiguamiento y su termino va entero a la parte explicita.
             motor_torque_raw = motor_stiff_torque + motor_damping * (target_vel - motor_vel)
-            if motor_saturation_effort is None:
-                # techo plano: |tau| <= effort_limit a cualquier velocidad
-                clamped = torch.clamp(motor_torque_raw, -motor_effort_limit, motor_effort_limit)
-            else:
-                # Curva par-velocidad del motor de CC, igual que DCMotor._clip_effort de Isaac Lab
-                # pero evaluada sobre la velocidad del ROTOR, no la del eslabon: en un actuador
-                # serie-elastico el que gira contra su propia curva es el motor, y entre motor y
-                # pata hay un resorte que los desacopla. Se recalcula en cada subpaso porque
-                # motor_vel cambia dentro del paso de fisica.
-                #
-                # La banda es asimetrica: acelerando (tau y vel del mismo signo) el techo baja con
-                # la velocidad; frenando (signos opuestos) el motor puede dar mas. Por eso se
-                # calculan max y min por separado en vez de un |tau| <= limite.
-                ratio = motor_vel / motor_velocity_limit
-                max_effort = torch.clamp(motor_saturation_effort * (1.0 - ratio), max=motor_effort_limit)
-                min_effort = torch.clamp(motor_saturation_effort * (-1.0 - ratio), min=-motor_effort_limit)
-                clamped = torch.clamp(motor_torque_raw, min=min_effort, max=max_effort)
+            # Techo de par a la velocidad del ROTOR (plano, o curva par-velocidad si se dio
+            # saturation_effort). Se recalcula en cada subpaso porque motor_vel cambia dentro del
+            # paso de fisica. La banda es asimetrica: acelerando el techo baja con la velocidad,
+            # frenando el motor puede dar mas, asi que min y max se calculan por separado.
+            min_effort, max_effort = motor_torque_bounds(
+                motor_vel, motor_effort_limit, motor_saturation_effort, motor_velocity_limit
+            )
+            clamped = torch.clamp(motor_torque_raw, min=min_effort, max=max_effort)
             saturated = clamped != motor_torque_raw
             if saturated.any():
                 explicit_torque = torch.where(

@@ -144,8 +144,11 @@ class ObservationsCfg:
         )
         #projected_gravity = ObsTerm(func=mdp.projected_gravity,noise=Gnoise(mean=0.0, std=0.048))
         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Gnoise(mean=0.0, std=0.1))
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Gnoise(mean=0.0,std=0.1))
+        # motor-side angle and velocity, which is what the encoder measures on the real robot.
+        # With rigid actuators these equal joint_pos_rel/joint_vel_rel; they only differ once a
+        # SeriesElasticActuator models the compliance between motor and link.
+        joint_pos = ObsTerm(func=mdp.motor_pos_rel, noise=Gnoise(mean=0.0, std=0.1))
+        joint_vel = ObsTerm(func=mdp.motor_vel_rel, noise=Gnoise(mean=0.0, std=0.1))
         # last 7 commanded actions (7 x 12 = 84 dims), to compensate for the action delay.
         # ActionDelayWrapper overwrites this slot; history_length must be >= the max delay lag.
         actions = ObsTerm(func=mdp.last_action, history_length=7, flatten_history_dim=True)
