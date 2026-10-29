@@ -1,0 +1,62 @@
+# Config COMPLETO (no un delta), para pasarselo directo a train_delay.py --experiment_config.
+#
+# Es exp_414_ang_vel_xy reconstruido a mano = champion_v3 + ang_vel_xy_l2 -0.2, mas el termino
+# stand_still activado. Se versiona aca en vez de editar
+# research/runs/delay_range/exp_414_ang_vel_xy/config.resolved.yaml porque ese archivo lo
+# REGENERA resolve_config() en cada corrida de run_experiment.py, y una edicion a mano se
+# perderia sin aviso. Ademas runs/ esta en .gitignore, asi que no viaja entre maquinas.
+#
+# stand_still (nuevo): castiga moverse cuando el comando de velocidad es ~cero. Hasta ahora el
+# termino existia con peso 0 y NUNCA se activo en ningun experimento de la investigacion. Apunta
+# a la falla vista en el robot real, que se frena y vibra en vez de quedarse quieto.
+#
+# OJO: con rel_standing_envs = 0.02 el robot practica comando cero solo el ~2% del tiempo, asi
+# que esta senal se evalua muy poco. Si el experimento no mueve el score, lo primero a subir es
+# esa fraccion en velocity_env_cfg.py (no se puede desde el YAML: env.commands no esta en
+# ALLOWED_PREFIXES).
+env:
+  rewards:
+    # --- champion_v3
+    joint_deviation:
+      weight: -0.2
+    gait:
+      weight: 3.5
+    feet_air_time:
+      weight: 4.0
+    action_rate_l2:
+      weight: -0.3
+    joint_deviation_shoulder:
+      weight: -0.5
+    knee_clearance:
+      weight: 0.5
+      params:
+        min_height: 0.1
+    # --- delta de exp_414: menos rolido/cabeceo
+    ang_vel_xy_l2:
+      weight: -0.2
+    # --- nuevo: quedarse quieto con comando cero
+    # Magnitud: la funcion devuelve gate * (base_motion + 0.01 * joint_motion); marchando,
+    # sum(qd^2) anda en 100-1000, asi que el termino vale ~1-10 y con -0.25 aporta -0.25 a -2.5,
+    # comparable a track_lin_vel_xy_exp (1.5). Rango razonable para barrer: -0.1 a -0.5.
+    stand_still:
+      weight: -0.25
+agent:
+  algorithm:
+    num_learning_epochs: 8
+  actor:
+    hidden_dims:
+    - 512
+    - 256
+    - 128
+  critic:
+    hidden_dims:
+    - 512
+    - 256
+    - 128
+  # Campos que normalmente fuerza el runner. Van aca porque este config se usa directo con
+  # train_delay.py, que aplica el YAML DESPUES de --max_iterations.
+  max_iterations: 1500
+  seed: 42
+  # Mantiene los checkpoints en logs/rsl_rl/anymal_d_flat/delay_range/<NAME>, que es la ruta que
+  # anuncia train_delayrange.sh.
+  experiment_name: anymal_d_flat/delay_range

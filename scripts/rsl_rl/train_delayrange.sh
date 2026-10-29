@@ -5,8 +5,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-NAME="${1:-move_sea_delayrange}"
-CFG=research/runs/delay_range/exp_414_ang_vel_xy/config.resolved.yaml
+NAME="${1:-move_sea_delayrange_standstill}"
+#CFG=research/runs/delay_range/exp_414_ang_vel_xy/config.resolved.yaml
+CFG=research/configs/delay_range/exp_414_stand_still.resolved.yaml
 
 # OJO: ese config trae experiment_name=anymal_d_flat/delay_range, asi que el checkpoint queda en
 #      logs/rsl_rl/anymal_d_flat/delay_range/$NAME/   (no en anymal_d_flat/$NAME)
